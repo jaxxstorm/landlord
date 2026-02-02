@@ -19,7 +19,7 @@ import (
 	"github.com/jaxxstorm/landlord/internal/workflow"
 )
 
-// TestIntegrationAPITriggersPlanWorkflow tests POST /api/tenants does not trigger workflows directly
+// TestIntegrationAPITriggersPlanWorkflow tests POST /v1/tenants does not trigger workflows directly
 func TestIntegrationAPITriggersPlanWorkflow(t *testing.T) {
 	logger, _ := zap.NewDevelopment()
 
@@ -60,7 +60,7 @@ func TestIntegrationAPITriggersPlanWorkflow(t *testing.T) {
 	}
 
 	body, _ := json.Marshal(reqBody)
-	req := httptest.NewRequest(http.MethodPost, "/api/tenants", bytes.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "/v1/tenants", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
@@ -87,7 +87,7 @@ func TestIntegrationAPITriggersPlanWorkflow(t *testing.T) {
 	}
 }
 
-// TestIntegrationAPITriggerUpdateWorkflow tests PUT /api/tenants/{id} does not trigger workflows directly
+// TestIntegrationAPITriggerUpdateWorkflow tests PUT /v1/tenants/{id} does not trigger workflows directly
 func TestIntegrationAPITriggerUpdateWorkflow(t *testing.T) {
 	logger, _ := zap.NewDevelopment()
 
@@ -129,7 +129,7 @@ func TestIntegrationAPITriggerUpdateWorkflow(t *testing.T) {
 	}
 
 	body, _ := json.Marshal(reqBody)
-	req := httptest.NewRequest(http.MethodPut, "/api/tenants/"+tenantID.String(), bytes.NewReader(body))
+	req := httptest.NewRequest(http.MethodPut, "/v1/tenants/"+tenantID.String(), bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 
 	// Add chi context
@@ -154,7 +154,7 @@ func TestIntegrationAPITriggerUpdateWorkflow(t *testing.T) {
 	}
 }
 
-// TestIntegrationAPITriggerDeleteWorkflow tests DELETE /api/tenants/{id} does not trigger workflows directly
+// TestIntegrationAPITriggerDeleteWorkflow tests DELETE /v1/tenants/{id} does not trigger workflows directly
 func TestIntegrationAPITriggerDeleteWorkflow(t *testing.T) {
 	logger, _ := zap.NewDevelopment()
 
@@ -191,7 +191,7 @@ func TestIntegrationAPITriggerDeleteWorkflow(t *testing.T) {
 		tenantRepo:     tenantRepo,
 	}
 
-	req := httptest.NewRequest(http.MethodDelete, "/api/tenants/"+tenantID.String(), nil)
+	req := httptest.NewRequest(http.MethodDelete, "/v1/tenants/"+tenantID.String(), nil)
 
 	// Add chi context
 	chiCtx := chi.NewRouteContext()
@@ -265,7 +265,7 @@ func TestIntegrationConcurrentAPITriggers(t *testing.T) {
 	body, _ := json.Marshal(reqBody)
 
 	// Make first request
-	req1 := httptest.NewRequest(http.MethodPut, "/api/tenants/"+tenantID.String(), bytes.NewReader(body))
+	req1 := httptest.NewRequest(http.MethodPut, "/v1/tenants/"+tenantID.String(), bytes.NewReader(body))
 	req1.Header.Set("Content-Type", "application/json")
 	chiCtx1 := chi.NewRouteContext()
 	chiCtx1.URLParams.Add("id", tenantID.String())
@@ -350,7 +350,7 @@ func TestIntegrationCreateSetWithComputeConfig(t *testing.T) {
 		},
 	}
 	body, _ := json.Marshal(createReq)
-	req := httptest.NewRequest(http.MethodPost, "/api/tenants", bytes.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "/v1/tenants", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	srv.handleCreateTenant(w, req)
@@ -369,7 +369,7 @@ func TestIntegrationCreateSetWithComputeConfig(t *testing.T) {
 		},
 	}
 	updateBody, _ := json.Marshal(updateReq)
-	updateHTTPReq := httptest.NewRequest(http.MethodPut, "/api/tenants/"+existingID.String(), bytes.NewReader(updateBody))
+	updateHTTPReq := httptest.NewRequest(http.MethodPut, "/v1/tenants/"+existingID.String(), bytes.NewReader(updateBody))
 	updateHTTPReq.Header.Set("Content-Type", "application/json")
 
 	chiCtx := chi.NewRouteContext()
@@ -413,7 +413,7 @@ func TestIntegrationAPITriggerFailureRecovery(t *testing.T) {
 	}
 
 	body, _ := json.Marshal(reqBody)
-	req := httptest.NewRequest(http.MethodPost, "/api/tenants", bytes.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "/v1/tenants", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 

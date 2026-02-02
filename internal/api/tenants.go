@@ -31,7 +31,7 @@ import (
 // @Failure 400 {object} models.ErrorResponse "Invalid request or validation error"
 // @Failure 409 {object} models.ErrorResponse "Tenant name already exists"
 // @Failure 500 {object} models.ErrorResponse "Internal server error"
-// @Router /api/tenants [post]
+// @Router /v1/tenants [post]
 func (s *Server) handleCreateTenant(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	requestID := r.Header.Get("X-Request-ID")
@@ -136,7 +136,7 @@ func (s *Server) handleCreateTenant(w http.ResponseWriter, r *http.Request) {
 // @Failure 400 {object} models.ErrorResponse "Invalid tenant identifier format"
 // @Failure 404 {object} models.ErrorResponse "Tenant not found"
 // @Failure 500 {object} models.ErrorResponse "Internal server error"
-// @Router /api/tenants/{id} [get]
+// @Router /v1/tenants/{id} [get]
 func (s *Server) handleGetTenant(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	requestID := r.Header.Get("X-Request-ID")
@@ -183,7 +183,7 @@ func (s *Server) handleGetTenant(w http.ResponseWriter, r *http.Request) {
 // @Success 200 {object} models.ListTenantsResponse "List of tenants"
 // @Failure 400 {object} models.ErrorResponse "Invalid pagination parameters"
 // @Failure 500 {object} models.ErrorResponse "Internal server error"
-// @Router /api/tenants [get]
+// @Router /v1/tenants [get]
 func (s *Server) handleListTenants(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	requestID := r.Header.Get("X-Request-ID")
@@ -278,7 +278,7 @@ func (s *Server) handleListTenants(w http.ResponseWriter, r *http.Request) {
 // @Failure 400 {object} models.ErrorResponse "Invalid request or validation error"
 // @Failure 404 {object} models.ErrorResponse "Tenant not found"
 // @Failure 500 {object} models.ErrorResponse "Internal server error"
-// @Router /api/tenants/{id} [put]
+// @Router /v1/tenants/{id} [put]
 func (s *Server) handleUpdateTenant(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	requestID := r.Header.Get("X-Request-ID")
@@ -423,7 +423,7 @@ func (s *Server) handleUpdateTenant(w http.ResponseWriter, r *http.Request) {
 // @Failure 404 {object} models.ErrorResponse "Tenant not found"
 // @Failure 409 {object} models.ErrorResponse "Invalid state transition"
 // @Failure 500 {object} models.ErrorResponse "Internal server error"
-// @Router /api/tenants/{id}/archive [post]
+// @Router /v1/tenants/{id}/archive [post]
 func (s *Server) handleArchiveTenant(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	requestID := r.Header.Get("X-Request-ID")
@@ -534,7 +534,7 @@ func (s *Server) handleArchiveTenant(w http.ResponseWriter, r *http.Request) {
 // @Failure 400 {object} models.ErrorResponse "Invalid tenant identifier format"
 // @Failure 404 {object} models.ErrorResponse "Tenant not found"
 // @Failure 500 {object} models.ErrorResponse "Internal server error"
-// @Router /api/tenants/{id} [delete]
+// @Router /v1/tenants/{id} [delete]
 func (s *Server) handleDeleteTenant(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	requestID := r.Header.Get("X-Request-ID")

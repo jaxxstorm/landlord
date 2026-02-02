@@ -1,10 +1,10 @@
 ## ADDED Requirements
 
 ### Requirement: Accept tenant creation requests
-The system SHALL provide a POST endpoint at `/api/tenants` that accepts JSON payloads to create new tenants.
+The system SHALL provide a POST endpoint at `/v1/tenants` that accepts JSON payloads to create new tenants.
 
 #### Scenario: Valid tenant creation request
-- **WHEN** a client sends a POST request to `/api/tenants` with valid tenant data
+- **WHEN** a client sends a POST request to `/v1/tenants` with valid tenant data
 - **THEN** the system accepts the request and processes it
 
 #### Scenario: Request includes required fields
@@ -56,7 +56,7 @@ The system SHALL include Swagger/OpenAPI annotations for the create tenant endpo
 
 #### Scenario: Swagger documentation present
 - **WHEN** the OpenAPI spec is generated
-- **THEN** it includes the POST `/api/tenants` endpoint with request/response schemas
+- **THEN** it includes the POST `/v1/tenants` endpoint with request/response schemas
 
 #### Scenario: Request schema documented
 - **WHEN** viewing API documentation
@@ -104,5 +104,5 @@ The system SHALL persist compute configuration as part of tenant desired state.
 - **THEN** the configuration is stored in Tenant.DesiredConfig for later provisioning
 
 #### Scenario: Configuration retrievable
-- **WHEN** a tenant is retrieved via GET /api/tenants/{id}
+- **WHEN** a tenant is retrieved via GET /v1/tenants/{id}
 - **THEN** the response includes the compute_config that was provided at creation

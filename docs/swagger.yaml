@@ -1,4 +1,4 @@
-basePath: /
+basePath: /v1
 definitions:
   models.ComputeConfigDiscoveryResponse:
     properties:
@@ -170,7 +170,7 @@ info:
   title: Landlord API
   version: "1.0"
 paths:
-  /api/compute/config:
+  /v1/compute/config:
     get:
       description: Returns the active compute provider and its compute_config schema (and defaults if available)
       produces:
@@ -187,7 +187,7 @@ paths:
       summary: Get compute config discovery
       tags:
       - compute
-  /api/docs:
+  /v1/docs:
     get:
       description: Serves the interactive API documentation using Redoc
       produces:
@@ -198,7 +198,7 @@ paths:
       summary: API documentation
       tags:
       - documentation
-  /api/swagger.json:
+  /v1/swagger.json:
     get:
       description: Returns the OpenAPI 3.0 specification for the API
       produces:
@@ -212,7 +212,7 @@ paths:
       summary: OpenAPI specification
       tags:
       - documentation
-  /api/tenants:
+  /v1/tenants:
     get:
       description: Returns a paginated list of tenants
       parameters:
@@ -279,7 +279,7 @@ paths:
       summary: Create a new tenant
       tags:
       - tenants
-  /api/tenants/{id}:
+  /v1/tenants/{id}:
     delete:
       description: Deletes a specific tenant resource
       parameters:
@@ -380,7 +380,7 @@ paths:
       summary: Update a tenant
       tags:
       - tenants
-  /api/tenants/{id}/archive:
+  /v1/tenants/{id}/archive:
     post:
       description: Archives a tenant by removing compute resources and retaining the
         record

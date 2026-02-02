@@ -135,7 +135,7 @@ func TestCreateTenantWithWorkflowTrigger(t *testing.T) {
 	}
 
 	body, _ := json.Marshal(reqBody)
-	req := httptest.NewRequest(http.MethodPost, "/api/tenants", strings.NewReader(string(body)))
+	req := httptest.NewRequest(http.MethodPost, "/v1/tenants", strings.NewReader(string(body)))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
@@ -185,7 +185,7 @@ func TestCreateTenantWorkflowTriggerFailure(t *testing.T) {
 	}
 
 	body, _ := json.Marshal(reqBody)
-	req := httptest.NewRequest(http.MethodPost, "/api/tenants", strings.NewReader(string(body)))
+	req := httptest.NewRequest(http.MethodPost, "/v1/tenants", strings.NewReader(string(body)))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
@@ -230,7 +230,7 @@ func TestUpdateTenantWithWorkflowTrigger(t *testing.T) {
 	body, _ := json.Marshal(reqBody)
 
 	// Create request with URL parameter using chi context
-	req := httptest.NewRequest(http.MethodPut, "/api/tenants/"+tenantID.String(), strings.NewReader(string(body)))
+	req := httptest.NewRequest(http.MethodPut, "/v1/tenants/"+tenantID.String(), strings.NewReader(string(body)))
 	req.Header.Set("Content-Type", "application/json")
 
 	// Manually set URL param since we're not using full router
@@ -291,7 +291,7 @@ func TestUpdateArchivedTenant(t *testing.T) {
 	}
 
 	body, _ := json.Marshal(reqBody)
-	req := httptest.NewRequest(http.MethodPut, "/api/tenants/"+tenantID.String(), strings.NewReader(string(body)))
+	req := httptest.NewRequest(http.MethodPut, "/v1/tenants/"+tenantID.String(), strings.NewReader(string(body)))
 	req.Header.Set("Content-Type", "application/json")
 	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, &chi.Context{
 		URLParams: chi.RouteParams{Keys: []string{"id"}, Values: []string{tenantID.String()}},
@@ -332,7 +332,7 @@ func TestDeleteTenantWithWorkflowTrigger(t *testing.T) {
 		tenantRepo:     tenantRepo,
 	}
 
-	req := httptest.NewRequest(http.MethodDelete, "/api/tenants/"+tenantID.String(), nil)
+	req := httptest.NewRequest(http.MethodDelete, "/v1/tenants/"+tenantID.String(), nil)
 	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, &chi.Context{
 		URLParams: chi.RouteParams{Keys: []string{"id"}, Values: []string{tenantID.String()}},
 	}))
@@ -385,7 +385,7 @@ func TestDeleteAlreadyDeletedTenant(t *testing.T) {
 		tenantRepo:     tenantRepo,
 	}
 
-	req := httptest.NewRequest(http.MethodDelete, "/api/tenants/"+tenantID.String(), nil)
+	req := httptest.NewRequest(http.MethodDelete, "/v1/tenants/"+tenantID.String(), nil)
 	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, &chi.Context{
 		URLParams: chi.RouteParams{Keys: []string{"id"}, Values: []string{tenantID.String()}},
 	}))
@@ -425,7 +425,7 @@ func TestWorkflowExecutionIDInResponse(t *testing.T) {
 		tenantRepo: tenantRepo,
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/api/tenants/"+tenantID.String(), nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/tenants/"+tenantID.String(), nil)
 	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, &chi.Context{
 		URLParams: chi.RouteParams{Keys: []string{"id"}, Values: []string{tenantID.String()}},
 	}))
@@ -469,7 +469,7 @@ func TestAPITriggersIncludeTriggerSource(t *testing.T) {
 	}
 
 	body, _ := json.Marshal(reqBody)
-	req := httptest.NewRequest(http.MethodPost, "/api/tenants", strings.NewReader(string(body)))
+	req := httptest.NewRequest(http.MethodPost, "/v1/tenants", strings.NewReader(string(body)))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
@@ -514,7 +514,7 @@ func TestCreateTenantWorkflowProviderUnavailable(t *testing.T) {
 	}
 
 	body, _ := json.Marshal(reqBody)
-	req := httptest.NewRequest(http.MethodPost, "/api/tenants", strings.NewReader(string(body)))
+	req := httptest.NewRequest(http.MethodPost, "/v1/tenants", strings.NewReader(string(body)))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
@@ -553,7 +553,7 @@ func TestUpdateTenantArchivedReturns409(t *testing.T) {
 	}
 
 	body, _ := json.Marshal(reqBody)
-	req := httptest.NewRequest(http.MethodPut, "/api/tenants/"+tenantID.String(), strings.NewReader(string(body)))
+	req := httptest.NewRequest(http.MethodPut, "/v1/tenants/"+tenantID.String(), strings.NewReader(string(body)))
 	req.Header.Set("Content-Type", "application/json")
 
 	// Add chi context for URL parameters
@@ -599,7 +599,7 @@ func TestDeleteTenantArchivedReturns200(t *testing.T) {
 		tenantRepo: tenantRepo,
 	}
 
-	req := httptest.NewRequest(http.MethodDelete, "/api/tenants/"+tenantID.String(), nil)
+	req := httptest.NewRequest(http.MethodDelete, "/v1/tenants/"+tenantID.String(), nil)
 
 	// Add chi context for URL parameters
 	chiCtx := chi.NewRouteContext()
@@ -642,7 +642,7 @@ func TestUpdateTenantInvalidStateTransition(t *testing.T) {
 	}
 
 	body, _ := json.Marshal(reqBody)
-	req := httptest.NewRequest(http.MethodPut, "/api/tenants/"+tenantID.String(), strings.NewReader(string(body)))
+	req := httptest.NewRequest(http.MethodPut, "/v1/tenants/"+tenantID.String(), strings.NewReader(string(body)))
 	req.Header.Set("Content-Type", "application/json")
 
 	// Add chi context for URL parameters

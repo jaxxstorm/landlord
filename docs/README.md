@@ -12,6 +12,10 @@ Landlord follows a reconciliation model:
 - A worker performs compute actions for workflow steps.
 - A database persists state, transitions, and audit history.
 
+## API versioning
+
+Landlord uses path-based API versioning. The current stable version is `v1`, and all HTTP endpoints are served under `/v1`.
+
 ## Components
 
 - **Compute**: Provisions runtime resources for tenants.

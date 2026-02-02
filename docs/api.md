@@ -1,6 +1,6 @@
 # API Browser
 
-This page embeds a standalone Swagger UI hosted at `api.html`. If the embedded view does not load, open `api.html` directly.
+This page embeds a standalone Swagger UI hosted at `api.html`. If the embedded view does not load, open `api.html` directly. The API is versioned under `/v1`.
 
 <style>
   #swagger-frame {

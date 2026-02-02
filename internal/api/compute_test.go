@@ -43,7 +43,7 @@ func TestHandleComputeConfigDiscovery(t *testing.T) {
 		},
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/api/compute/config", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/compute/config", nil)
 	w := httptest.NewRecorder()
 
 	srv.handleComputeConfigDiscovery(w, req)
@@ -71,7 +71,7 @@ func TestHandleComputeConfigDiscovery(t *testing.T) {
 func TestHandleComputeConfigDiscovery_NoProvider(t *testing.T) {
 	srv := &Server{}
 
-	req := httptest.NewRequest(http.MethodGet, "/api/compute/config", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/compute/config", nil)
 	w := httptest.NewRecorder()
 
 	srv.handleComputeConfigDiscovery(w, req)

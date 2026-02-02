@@ -1,10 +1,10 @@
 ## ADDED Requirements
 
 ### Requirement: Delete tenant by ID
-The system SHALL provide a DELETE endpoint at `/api/tenants/{id}` that archives a tenant by UUID or name and removes it from the database when deletion is finalized.
+The system SHALL provide a DELETE endpoint at `/v1/tenants/{id}` that archives a tenant by UUID or name and removes it from the database when deletion is finalized.
 
 #### Scenario: Valid delete request
-- **WHEN** a client sends a DELETE request to `/api/tenants/{id}` with a valid UUID or name
+- **WHEN** a client sends a DELETE request to `/v1/tenants/{id}` with a valid UUID or name
 - **THEN** the system attempts to delete that tenant
 
 #### Scenario: Tenant exists
@@ -43,7 +43,7 @@ The system SHALL remove all tenant-related data and resources during deletion.
 The system SHALL require explicit tenant ID in the path to prevent bulk deletions.
 
 #### Scenario: No bulk delete endpoint
-- **WHEN** a DELETE request is sent to `/api/tenants` without an ID
+- **WHEN** a DELETE request is sent to `/v1/tenants` without an ID
 - **THEN** the system returns HTTP 405 Method Not Allowed or HTTP 400
 
 ### Requirement: Support idempotent deletion
@@ -58,7 +58,7 @@ The system SHALL include Swagger/OpenAPI annotations for the delete tenant endpo
 
 #### Scenario: Swagger documentation present
 - **WHEN** the OpenAPI spec is generated
-- **THEN** it includes the DELETE `/api/tenants/{id}` endpoint
+- **THEN** it includes the DELETE `/v1/tenants/{id}` endpoint
 
 #### Scenario: Path parameter documented
 - **WHEN** viewing API documentation

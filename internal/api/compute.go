@@ -14,7 +14,7 @@ import (
 // @Produce json
 // @Success 200 {object} models.ComputeConfigDiscoveryResponse "Compute config discovery"
 // @Failure 500 {object} models.ErrorResponse "Compute provider not configured"
-// @Router /api/compute/config [get]
+// @Router /v1/compute/config [get]
 func (s *Server) handleComputeConfigDiscovery(w http.ResponseWriter, r *http.Request) {
 	requestID := r.Header.Get("X-Request-ID")
 	if s.computeProvider == nil {

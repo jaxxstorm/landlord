@@ -22,6 +22,10 @@ Example CLI flow:
 go run ./cmd/cli create --tenant-name demo-tenant --image nginx:alpine
 ```
 
+## API versioning
+
+All HTTP APIs are versioned with a path prefix. The current stable version is `v1`, so endpoints look like `/v1/tenants` and `/v1/compute/config`.
+
 ## Documentation
 
 Public docs live in `docs/` and are viewable with Docsify. Start with:

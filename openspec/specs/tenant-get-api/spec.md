@@ -1,14 +1,14 @@
 ## ADDED Requirements
 
 ### Requirement: Retrieve tenant by ID
-The system SHALL provide a GET endpoint at `/api/tenants/{id}` that retrieves a specific tenant by its UUID or name.
+The system SHALL provide a GET endpoint at `/v1/tenants/{id}` that retrieves a specific tenant by its UUID or name.
 
 #### Scenario: Valid tenant ID provided
-- **WHEN** a client sends a GET request to `/api/tenants/{id}` with a valid UUID
+- **WHEN** a client sends a GET request to `/v1/tenants/{id}` with a valid UUID
 - **THEN** the system looks up the tenant by that ID
 
 #### Scenario: Valid tenant name provided
-- **WHEN** a client sends a GET request to `/api/tenants/{id}` with a non-UUID value
+- **WHEN** a client sends a GET request to `/v1/tenants/{id}` with a non-UUID value
 - **THEN** the system looks up the tenant by name
 
 #### Scenario: Tenant exists
@@ -45,7 +45,7 @@ The system SHALL include Swagger/OpenAPI annotations for the get tenant endpoint
 
 #### Scenario: Swagger documentation present
 - **WHEN** the OpenAPI spec is generated
-- **THEN** it includes the GET `/api/tenants/{id}` endpoint with path parameter
+- **THEN** it includes the GET `/v1/tenants/{id}` endpoint with path parameter
 
 #### Scenario: Path parameter documented
 - **WHEN** viewing API documentation

@@ -15,9 +15,9 @@ const docTemplate = `{
         "contact": {},
         "version": "1.0"
     },
-    "basePath": "/",
+    "basePath": "/v1",
     "paths": {
-        "/api/docs": {
+        "/v1/docs": {
             "get": {
                 "description": "Serves the interactive API documentation using Redoc",
                 "produces": [
@@ -34,7 +34,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/swagger.json": {
+        "/v1/swagger.json": {
             "get": {
                 "description": "Returns the OpenAPI 3.0 specification for the API",
                 "produces": [
@@ -55,7 +55,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/tenants": {
+        "/v1/tenants": {
             "get": {
                 "description": "Returns a paginated list of tenants",
                 "produces": [
@@ -157,7 +157,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/tenants/{id}": {
+        "/v1/tenants/{id}": {
             "get": {
                 "description": "Retrieves a specific tenant resource",
                 "produces": [
@@ -309,7 +309,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/tenants/{id}/archive": {
+        "/v1/tenants/{id}/archive": {
             "post": {
                 "description": "Archives a tenant by removing compute resources and retaining the record",
                 "tags": [
@@ -416,7 +416,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/compute/config": {
+        "/v1/compute/config": {
             "get": {
                 "description": "Returns the active compute provider and its compute_config schema (and defaults if available)",
                 "produces": [

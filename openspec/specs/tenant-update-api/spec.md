@@ -1,10 +1,10 @@
 ## ADDED Requirements
 
 ### Requirement: Update tenant properties
-The system SHALL provide a PUT or PATCH endpoint at `/api/tenants/{id}` that updates tenant properties identified by UUID or name.
+The system SHALL provide a PUT or PATCH endpoint at `/v1/tenants/{id}` that updates tenant properties identified by UUID or name.
 
 #### Scenario: Valid update request
-- **WHEN** a client sends a PUT request to `/api/tenants/{id}` with valid update data
+- **WHEN** a client sends a PUT request to `/v1/tenants/{id}` with valid update data
 - **THEN** the system processes the update
 
 #### Scenario: Tenant exists
@@ -63,7 +63,7 @@ The system SHALL include Swagger/OpenAPI annotations for the update tenant endpo
 
 #### Scenario: Swagger documentation present
 - **WHEN** the OpenAPI spec is generated
-- **THEN** it includes the PUT `/api/tenants/{id}` endpoint
+- **THEN** it includes the PUT `/v1/tenants/{id}` endpoint
 
 #### Scenario: Request schema documented
 - **WHEN** viewing API documentation

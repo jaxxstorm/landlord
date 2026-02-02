@@ -5,10 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strings"
 	"time"
 
 	"go.uber.org/zap"
+
+	"github.com/jaxxstorm/landlord/internal/apiversion"
 )
 
 // HTTPLandlordClient fetches tenant data from the landlord HTTP API.
@@ -21,7 +22,7 @@ type HTTPLandlordClient struct {
 // NewHTTPLandlordClient creates a new HTTP client for the landlord API.
 func NewHTTPLandlordClient(baseURL string, logger *zap.Logger) *HTTPLandlordClient {
 	return &HTTPLandlordClient{
-		baseURL:    strings.TrimRight(baseURL, "/"),
+		baseURL:    apiversion.NormalizeBaseURL(baseURL),
 		httpClient: &http.Client{Timeout: 10 * time.Second},
 		logger:     logger.With(zap.String("component", "landlord-http-client")),
 	}
@@ -33,7 +34,7 @@ func (c *HTTPLandlordClient) GetTenant(ctx context.Context, tenantUUID string) (
 		return nil, fmt.Errorf("tenant UUID is required")
 	}
 
-	url := fmt.Sprintf("%s/api/tenants/%s", c.baseURL, tenantUUID)
+	url := fmt.Sprintf("%s/tenants/%s", c.baseURL, tenantUUID)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)

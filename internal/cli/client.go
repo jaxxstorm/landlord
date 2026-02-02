@@ -7,11 +7,12 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
 	"time"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jaxxstorm/landlord/internal/api/models"
+	"github.com/jaxxstorm/landlord/internal/apiversion"
 )
 
 type Client struct {
@@ -20,7 +21,7 @@ type Client struct {
 }
 
 func NewClient(baseURL string) *Client {
-	baseURL = strings.TrimRight(baseURL, "/")
+	baseURL = apiversion.NormalizeBaseURL(baseURL)
 	return &Client{
 		baseURL: baseURL,
 		httpClient: &http.Client{
@@ -30,7 +31,7 @@ func NewClient(baseURL string) *Client {
 }
 
 func (c *Client) CreateTenant(ctx context.Context, req models.CreateTenantRequest) (*models.TenantResponse, error) {
-	url := fmt.Sprintf("%s/api/tenants", c.baseURL)
+	url := fmt.Sprintf("%s/tenants", c.baseURL)
 	body, err := json.Marshal(req)
 	if err != nil {
 		return nil, fmt.Errorf("marshal request: %w", err)
@@ -61,7 +62,7 @@ func (c *Client) CreateTenant(ctx context.Context, req models.CreateTenantReques
 }
 
 func (c *Client) ListTenants(ctx context.Context, includeDeleted bool) (*models.ListTenantsResponse, error) {
-	url := fmt.Sprintf("%s/api/tenants", c.baseURL)
+	url := fmt.Sprintf("%s/tenants", c.baseURL)
 	if includeDeleted {
 		url = fmt.Sprintf("%s?include_deleted=true", url)
 	}
@@ -94,7 +95,7 @@ func (c *Client) DeleteTenant(ctx context.Context, tenantID string) (*models.Ten
 		return nil, err
 	}
 
-	url := fmt.Sprintf("%s/api/tenants/%s", c.baseURL, id)
+	url := fmt.Sprintf("%s/tenants/%s", c.baseURL, id)
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("build request: %w", err)
@@ -128,7 +129,7 @@ func (c *Client) ArchiveTenant(ctx context.Context, tenantID string) (*models.Te
 		return nil, err
 	}
 
-	url := fmt.Sprintf("%s/api/tenants/%s/archive", c.baseURL, id)
+	url := fmt.Sprintf("%s/tenants/%s/archive", c.baseURL, id)
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("build request: %w", err)
@@ -158,7 +159,7 @@ func (c *Client) GetTenant(ctx context.Context, tenantID string) (*models.Tenant
 		return nil, err
 	}
 
-	url := fmt.Sprintf("%s/api/tenants/%s", c.baseURL, id)
+	url := fmt.Sprintf("%s/tenants/%s", c.baseURL, id)
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("build request: %w", err)
@@ -188,7 +189,7 @@ func (c *Client) UpdateTenant(ctx context.Context, tenantID string, method strin
 		return nil, err
 	}
 
-	url := fmt.Sprintf("%s/api/tenants/%s", c.baseURL, id)
+	url := fmt.Sprintf("%s/tenants/%s", c.baseURL, id)
 	body, err := json.Marshal(req)
 	if err != nil {
 		return nil, fmt.Errorf("marshal request: %w", err)
@@ -219,7 +220,7 @@ func (c *Client) UpdateTenant(ctx context.Context, tenantID string, method strin
 }
 
 func (c *Client) GetComputeConfigDiscovery(ctx context.Context) (*models.ComputeConfigDiscoveryResponse, error) {
-	url := fmt.Sprintf("%s/api/compute/config", c.baseURL)
+	url := fmt.Sprintf("%s/compute/config", c.baseURL)
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("build request: %w", err)

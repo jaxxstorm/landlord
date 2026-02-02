@@ -6,6 +6,13 @@ Define the public documentation and README expectations for Landlord. (TBD)
 
 ## ADDED Requirements
 
+### Requirement: Document API versioning scheme
+Public documentation SHALL describe the versioned base path and list supported API versions.
+
+#### Scenario: Reader views API documentation
+- **WHEN** a reader opens README.md or the API docs
+- **THEN** the docs show example versioned URLs (e.g., `/v1/tenants`) and the supported version list
+
 ### Requirement: Public root README overview
 The root README.md SHALL present a public-facing overview of Landlord with a concise description, a quick example of how it works, and a clear pointer to the docs site under `docs/`.
 

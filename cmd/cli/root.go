@@ -20,7 +20,7 @@ func newRootCommand() *cobra.Command {
 	}
 
 	cmd.PersistentFlags().String("config", "", "Config file path")
-	cmd.PersistentFlags().String("api-url", "http://localhost:8081", "Landlord API base URL")
+	cmd.PersistentFlags().String("api-url", "http://localhost:8081", "Landlord API base URL (versioned paths are appended if missing)")
 
 	if err := bindCLIFlags(cmd); err != nil {
 		cmd.PrintErrln(fmt.Sprintf("failed to bind flags: %v", err))

@@ -30,17 +30,17 @@ func TestClientCreateListDelete(t *testing.T) {
 
 	server := newTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
-		case r.Method == http.MethodPost && r.URL.Path == "/api/tenants":
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/tenants":
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusCreated)
 			_, _ = w.Write([]byte(`{"id":"123","name":"demo","status":"planning","desired_image":"nginx:alpine"}`))
-		case r.Method == http.MethodPost && r.URL.Path == "/api/tenants/123/archive":
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/tenants/123/archive":
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{"id":"123","name":"demo","status":"archiving","desired_image":"nginx:alpine"}`))
-		case r.Method == http.MethodGet && r.URL.Path == "/api/tenants":
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/tenants":
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{"tenants":[{"id":"123","name":"demo","status":"archived","desired_image":"nginx:alpine"}],"total":1,"limit":50,"offset":0}`))
-		case r.Method == http.MethodDelete && r.URL.Path == "/api/tenants/123":
+		case r.Method == http.MethodDelete && r.URL.Path == "/v1/tenants/123":
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{"id":"123","name":"demo","status":"deleting","desired_image":"nginx:alpine"}`))
 		default:
@@ -91,13 +91,13 @@ func TestClientGetUpdateTenant(t *testing.T) {
 
 	server := newTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
-		case r.Method == http.MethodGet && r.URL.Path == "/api/tenants":
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/tenants":
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{"tenants":[{"id":"123","name":"demo","status":"ready","desired_image":"nginx:alpine"}],"total":1,"limit":50,"offset":0}`))
-		case r.Method == http.MethodGet && r.URL.Path == "/api/tenants/123":
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/tenants/123":
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{"id":"123","name":"demo","status":"ready","desired_image":"nginx:alpine"}`))
-		case r.Method == http.MethodPut && r.URL.Path == "/api/tenants/123":
+		case r.Method == http.MethodPut && r.URL.Path == "/v1/tenants/123":
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{"id":"123","name":"demo","status":"planning","desired_image":"nginx:1.25"}`))
 		default:
@@ -121,7 +121,7 @@ func TestClientComputeConfigDiscovery(t *testing.T) {
 	t.Parallel()
 
 	server := newTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet || r.URL.Path != "/api/compute/config" {
+		if r.Method != http.MethodGet || r.URL.Path != "/v1/compute/config" {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}

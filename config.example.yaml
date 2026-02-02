@@ -168,6 +168,7 @@ workflow:
   #   worker_admin_endpoint: http://localhost:9070
   #   worker_namespace: ""
   #   worker_service_prefix: ""
+  #   # Landlord API base URL (versioned paths are appended if missing)
   #   worker_landlord_api_url: http://localhost:8080
   #   worker_compute_provider: mock
   #   worker_compute_cache_ttl: 5m

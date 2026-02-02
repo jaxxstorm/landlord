@@ -1,0 +1,65 @@
+:root {
+  --theme-color: #2d6cdf;
+  --base-font-family: "Helvetica Neue", Arial, sans-serif;
+  --base-font-size: 16px;
+  --sidebar-width: 280px;
+  --content-max-width: 900px;
+}
+
+body {
+  background: #f8f9fb;
+}
+
+.sidebar {
+  background: #ffffff;
+  border-right: 1px solid #e6e8ee;
+}
+
+.content {
+  background: #ffffff;
+  box-shadow: 0 8px 28px rgba(24, 32, 48, 0.06);
+  border-radius: 12px;
+  padding: 24px 32px;
+}
+
+.markdown-section a {
+  color: var(--theme-color);
+}
+
+.markdown-section code {
+  background: #f1f3f7;
+  border-radius: 6px;
+  padding: 2px 6px;
+}
+
+.markdown-section pre {
+  background: #f1f3f7;
+  border-radius: 10px;
+}
+
+.markdown-section table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.markdown-section table th,
+.markdown-section table td {
+  border: 1px solid #e1e5ef;
+  padding: 10px 12px;
+}
+
+.markdown-section table th {
+  background: #f5f6fb;
+  text-align: left;
+}
+
+.docsify-copy-code-button {
+  border-radius: 6px;
+}
+
+@media (max-width: 768px) {
+  .content {
+    border-radius: 0;
+    padding: 20px 18px;
+  }
+}

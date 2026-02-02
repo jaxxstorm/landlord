@@ -1,0 +1,127 @@
+# Example Restate Configuration - Production (AWS Lambda)
+
+This example shows a production configuration for AWS Lambda deployment.
+
+```yaml
+# config.yaml - Production with Lambda
+
+log:
+  level: "info"
+  format: "json"
+
+http:
+  port: 3000
+  address: "0.0.0.0:3000"
+
+database:
+  host: "landlord-db.cxxxxxx.us-west-2.rds.amazonaws.com"
+  port: 5432
+  database: "landlord"
+  username: "landlord"
+  password: "${DB_PASSWORD}"
+  ssl_mode: "require"
+
+compute:
+  default_provider: "mock"
+
+workflow:
+  default_provider: "restate"
+  restate:
+    endpoint: "https://restate-api.prod.internal:8080"
+    execution_mechanism: "lambda"
+    service_name: ""                  # Use default (derived from workflow ID)
+    auth_type: "iam"                  # Uses Lambda execution role
+    timeout: 1h
+    retry_attempts: 3
+  
+  step_functions:
+    region: "us-west-2"
+    role_arn: "arn:aws:iam::123456789:role/StepFunctionsRole"
+```
+
+## How to Deploy
+
+### 1. Deploy Restate to Lambda
+
+Follow [Restate Lambda Deployment Guide](../restate-production-deployment.md#aws-lambda-deployment)
+
+### 2. Create Lambda Execution Role
+
+```bash
+# Create role
+aws iam create-role --role-name landlord-lambda-role \
+  --assume-role-policy-document file://trust-policy.json
+
+# Attach policy
+aws iam put-role-policy --role-name landlord-lambda-role \
+  --policy-name restate-invoke \
+  --policy-document file://restate-invoke-policy.json
+```
+
+### 3. Deploy Landlord to Lambda
+
+```bash
+# Build Docker image
+docker build -t landlord:latest .
+
+# Push to ECR
+aws ecr get-login-password | docker login --username AWS --password-stdin <account>.dkr.ecr.us-west-2.amazonaws.com
+docker tag landlord:latest <account>.dkr.ecr.us-west-2.amazonaws.com/landlord:latest
+docker push <account>.dkr.ecr.us-west-2.amazonaws.com/landlord:latest
+
+# Deploy Lambda function
+aws lambda create-function \
+  --function-name landlord \
+  --role arn:aws:iam::123456789:role/landlord-lambda-role \
+  --code ImageUri=<account>.dkr.ecr.us-west-2.amazonaws.com/landlord:latest \
+  --handler app.lambda_handler \
+  --environment Variables="{...}"
+```
+
+## Environment Variables
+
+Instead of config.yaml, set Lambda environment variables:
+
+```bash
+aws lambda update-function-configuration \
+  --function-name landlord \
+  --environment Variables='{
+    "LANDLORD_LOG_LEVEL": "info",
+    "LANDLORD_DATABASE_HOST": "landlord-db.cxxxxxx.us-west-2.rds.amazonaws.com",
+    "LANDLORD_DATABASE_PASSWORD": "...",
+    "LANDLORD_WORKFLOW_DEFAULT_PROVIDER": "restate",
+    "LANDLORD_WORKFLOW_RESTATE_ENDPOINT": "https://restate-api.prod.internal:8080",
+    "LANDLORD_WORKFLOW_RESTATE_EXECUTION_MECHANISM": "lambda",
+    "LANDLORD_WORKFLOW_RESTATE_AUTH_TYPE": "iam"
+  }'
+```
+
+## Monitoring
+
+Set up CloudWatch alarms for:
+
+- **Lambda Errors**: `aws lambda get-function-concurrency`
+- **Workflow Failures**: Monitor through Landlord API
+- **Restate Health**: Check Restate API endpoint
+
+## Costs
+
+- Lambda: Pay for execution time and number of invocations
+- Restate: Pay based on chosen plan
+- RDS: On-demand or reserved instances
+- Data transfer: Between AWS services (typically free within region)
+
+## Scaling
+
+Lambda automatically scales to handle load. Monitor:
+
+- Reserved concurrency setting
+- Timeout configuration (don't set too high)
+- Memory allocation (affects CPU and cost)
+
+## Next Steps
+
+- Setup monitoring and alerting
+- Configure backup of RDS database
+- Plan disaster recovery procedures
+- Performance test before production launch

@@ -1,0 +1,50 @@
+.swagger-ui {
+  font-family: var(--base-font-family, "Helvetica Neue", Arial, sans-serif);
+  color: #1d2433;
+}
+
+.swagger-ui .topbar {
+  background: #ffffff;
+  border-bottom: 1px solid #e6e8ee;
+}
+
+.swagger-ui .topbar .download-url-wrapper {
+  display: none;
+}
+
+.swagger-ui .info {
+  margin: 20px 0 10px;
+}
+
+.swagger-ui .scheme-container {
+  background: #f5f6fb;
+  box-shadow: none;
+  border: 1px solid #e1e5ef;
+}
+
+.swagger-ui .opblock {
+  border-radius: 8px;
+  border: 1px solid #e1e5ef;
+  box-shadow: none;
+}
+
+.swagger-ui .opblock-summary {
+  background: #ffffff;
+}
+
+.swagger-ui .opblock-summary-method {
+  border-radius: 6px;
+}
+
+.swagger-ui .btn {
+  border-radius: 6px;
+}
+
+.swagger-ui table {
+  border-collapse: collapse;
+}
+
+.swagger-ui table td,
+.swagger-ui table th {
+  border: 1px solid #e1e5ef;
+}

@@ -1,0 +1,54 @@
+# Version control
+.git
+.gitignore
+.github
+
+# Documentation
+*.md
+docs/
+openspec/
+
+# IDE and editor files
+.vscode
+.idea
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Build artifacts
+landlord
+*.o
+*.a
+bin/
+dist/
+
+# Go cache and modules
+.go
+vendor
+
+# Test coverage
+*.out
+*.coverprofile
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Docker files (don't copy into build context)
+.docker
+.dockerignore
+Dockerfile
+
+# Configuration files
+docker-compose.yml
+test.config.yaml
+config.example.yaml
+
+# Makefile
+Makefile
+
+# Node modules and npm (if any frontend builds)
+node_modules
+package-lock.json

@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Landlord API Browser</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist/swagger-ui.css">
+    <link rel="stylesheet" href="theme.css">
+    <link rel="stylesheet" href="swagger-ui.css">
+    <style>
+      html, body {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        background: #f8f9fb;
+      }
+
+      #swagger-ui {
+        padding: 18px 24px 40px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="swagger-ui"></div>
+
+    <script src="https://unpkg.com/swagger-ui-dist/swagger-ui-bundle.js"></script>
+    <script>
+      (function () {
+        if (!window.SwaggerUIBundle) {
+          return;
+        }
+
+        SwaggerUIBundle({
+          url: 'swagger.json',
+          dom_id: '#swagger-ui',
+          deepLinking: true,
+          presets: [
+            SwaggerUIBundle.presets.apis
+          ],
+          layout: 'BaseLayout'
+        });
+      })();
+    </script>
+  </body>
+</html>

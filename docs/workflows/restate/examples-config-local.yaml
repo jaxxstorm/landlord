@@ -1,0 +1,107 @@
+# Example Restate Configuration - Local Development
+
+This example shows a typical configuration for local development with Docker Compose.
+
+```yaml
+# config.yaml - Local Development
+
+log:
+  level: "debug"
+  format: "json"
+
+http:
+  port: 3000
+  address: "0.0.0.0:3000"
+
+database:
+  host: "localhost"
+  port: 5432
+  database: "landlord"
+  username: "landlord"
+  password: "landlord-password"
+  ssl_mode: "disable"
+
+compute:
+  default_provider: "mock"
+
+workflow:
+  default_provider: "restate"
+  restate:
+    endpoint: "http://localhost:8080"
+    execution_mechanism: "local"
+    service_name: ""                  # Use default (derived from workflow ID)
+    auth_type: "none"
+    timeout: 30m
+    retry_attempts: 3
+  
+  step_functions:
+    region: ""                         # Disabled for local development
+    role_arn: ""
+```
+
+## How to Use
+
+1. **Save this as `config.yaml` in your Landlord directory**
+
+2. **Start Restate** (in one terminal):
+   ```bash
+   docker-compose up restate
+   ```
+
+3. **Run Landlord** (in another terminal):
+   ```bash
+   landlord server
+   ```
+
+4. **Create a workflow**:
+   ```bash
+   cat > my-workflow.yaml << 'EOF'
+   workflows:
+     - id: my-first-workflow
+       definition: echo "Hello, Restate!"
+   EOF
+   
+   landlord workflow create my-first-workflow \
+     --definition my-workflow.yaml
+   ```
+
+5. **Execute the workflow**:
+   ```bash
+   landlord workflow execute my-first-workflow
+   ```
+
+## Alternative: Using Environment Variables
+
+Instead of `config.yaml`, set environment variables:
+
+```bash
+export LANDLORD_LOG_LEVEL=debug
+export LANDLORD_HTTP_PORT=3000
+export LANDLORD_DATABASE_HOST=localhost
+export LANDLORD_DATABASE_PORT=5432
+export LANDLORD_DATABASE_DATABASE=landlord
+export LANDLORD_DATABASE_USERNAME=landlord
+export LANDLORD_DATABASE_PASSWORD=landlord-password
+export LANDLORD_WORKFLOW_DEFAULT_PROVIDER=restate
+export LANDLORD_WORKFLOW_RESTATE_ENDPOINT=http://localhost:8080
+export LANDLORD_WORKFLOW_RESTATE_EXECUTION_MECHANISM=local
+export LANDLORD_WORKFLOW_RESTATE_AUTH_TYPE=none
+export LANDLORD_WORKFLOW_RESTATE_TIMEOUT=30m
+export LANDLORD_WORKFLOW_RESTATE_RETRY_ATTEMPTS=3
+
+landlord server
+```
+
+## Monitoring
+
+Once running, you can:
+
+- **Access Landlord API**: http://localhost:3000
+- **Access Restate Console**: http://localhost:8080
+- **View logs**: `docker-compose logs -f`
+
+## Next Steps
+
+- Modify timeout if workflows take longer
+- Add authentication (api_key) for local production testing
+- Deploy to production (see Production example)

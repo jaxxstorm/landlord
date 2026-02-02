@@ -1,0 +1,35 @@
+# Landlord Configuration - SQLite In-Memory
+# This configuration uses an in-memory SQLite database
+# Ideal for testing and CI/CD environments with fast iteration
+
+# HTTP Server Configuration
+http:
+  addr: ":8080"
+  shutdownTimeout: 30s
+
+# Database Configuration - SQLite In-Memory
+database:
+  # Provider selection
+  provider: sqlite
+  
+  # SQLite in-memory configuration
+  sqlite:
+    # Use :memory: for in-memory database (data lost on app restart)
+    path: ":memory:"
+    
+    # Busy timeout for concurrent access
+    busyTimeout: 5s
+
+# Logging Configuration
+log:
+  level: debug
+  format: development
+  development: true
+
+# Compute Configuration
+compute:
+  defaultProvider: mock
+
+# Workflow Configuration  
+workflow:
+  defaultProvider: mock

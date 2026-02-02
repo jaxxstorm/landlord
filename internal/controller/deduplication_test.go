@@ -1,0 +1,515 @@
+package controller
+
+import (
+	"context"
+	"fmt"
+	"testing"
+
+	"go.uber.org/zap"
+
+	"github.com/google/uuid"
+	"github.com/jaxxstorm/landlord/internal/tenant"
+	"github.com/jaxxstorm/landlord/internal/workflow"
+)
+
+// mockTenantRepository implements tenant.Repository for testing controller
+type mockTenantRepository struct {
+	getTenantByIDFunc   func(ctx context.Context, id uuid.UUID) (*tenant.Tenant, error)
+	getTenantByNameFunc func(ctx context.Context, name string) (*tenant.Tenant, error)
+	updateTenantFunc    func(ctx context.Context, t *tenant.Tenant) error
+	deleteTenantFunc    func(ctx context.Context, id uuid.UUID) error
+}
+
+func (m *mockTenantRepository) GetTenantByID(ctx context.Context, id uuid.UUID) (*tenant.Tenant, error) {
+	if m.getTenantByIDFunc != nil {
+		return m.getTenantByIDFunc(ctx, id)
+	}
+	return nil, tenant.ErrTenantNotFound
+}
+
+func (m *mockTenantRepository) GetTenantByName(ctx context.Context, name string) (*tenant.Tenant, error) {
+	if m.getTenantByNameFunc != nil {
+		return m.getTenantByNameFunc(ctx, name)
+	}
+	return nil, tenant.ErrTenantNotFound
+}
+
+func (m *mockTenantRepository) UpdateTenant(ctx context.Context, t *tenant.Tenant) error {
+	if m.updateTenantFunc != nil {
+		return m.updateTenantFunc(ctx, t)
+	}
+	return nil
+}
+
+func (m *mockTenantRepository) CreateTenant(ctx context.Context, t *tenant.Tenant) error {
+	return nil
+}
+
+func (m *mockTenantRepository) ListTenants(ctx context.Context, filters tenant.ListFilters) ([]*tenant.Tenant, error) {
+	return nil, nil
+}
+
+func (m *mockTenantRepository) ListTenantsForReconciliation(ctx context.Context) ([]*tenant.Tenant, error) {
+	return nil, nil
+}
+
+func (m *mockTenantRepository) RecordStateTransition(ctx context.Context, transition *tenant.StateTransition) error {
+	return nil
+}
+
+func (m *mockTenantRepository) GetStateHistory(ctx context.Context, tenantID uuid.UUID) ([]*tenant.StateTransition, error) {
+	return nil, nil
+}
+
+func (m *mockTenantRepository) DeleteTenant(ctx context.Context, id uuid.UUID) error {
+	if m.deleteTenantFunc != nil {
+		return m.deleteTenantFunc(ctx, id)
+	}
+	return nil
+}
+
+// mockWorkflowClientForController implements WorkflowClient interface for testing
+type mockWorkflowClientForController struct {
+	triggerFunc           func(ctx context.Context, t *tenant.Tenant, action string) (string, error)
+	triggerWithSourceFunc func(ctx context.Context, t *tenant.Tenant, action, source string) (string, error)
+	determineActionFunc   func(status tenant.Status) (string, error)
+	getStatusFunc         func(ctx context.Context, executionID string) (*workflow.ExecutionStatus, error)
+}
+
+func (m *mockWorkflowClientForController) TriggerWorkflow(ctx context.Context, t *tenant.Tenant, action string) (string, error) {
+	// Match real implementation: delegate to TriggerWorkflowWithSource with "controller" source
+	return m.TriggerWorkflowWithSource(ctx, t, action, "controller")
+}
+
+func (m *mockWorkflowClientForController) TriggerWorkflowWithSource(ctx context.Context, t *tenant.Tenant, action, source string) (string, error) {
+	if m.triggerWithSourceFunc != nil {
+		return m.triggerWithSourceFunc(ctx, t, action, source)
+	}
+	return "exec-123", nil
+}
+
+func (m *mockWorkflowClientForController) DetermineAction(status tenant.Status) (string, error) {
+	if m.determineActionFunc != nil {
+		return m.determineActionFunc(status)
+	}
+	return "provision", nil
+}
+
+func (m *mockWorkflowClientForController) GetExecutionStatus(ctx context.Context, executionID string) (*workflow.ExecutionStatus, error) {
+	if m.getStatusFunc != nil {
+		return m.getStatusFunc(ctx, executionID)
+	}
+	return &workflow.ExecutionStatus{
+		ExecutionID: executionID,
+		State:       workflow.StateRunning,
+	}, nil
+}
+
+// TestControllerSkipsActiveWorkflow tests controller skips tenant with active workflow
+func TestControllerSkipsActiveWorkflow(t *testing.T) {
+	logger, _ := zap.NewDevelopment()
+
+	activeTenant := &tenant.Tenant{
+		ID:                  uuid.New(),
+		Name:                "test-tenant",
+		Status:              tenant.StatusProvisioning,
+		WorkflowExecutionID: stringPtr("exec-active-123"),
+	}
+
+	triggerCount := 0
+	wfClient := &mockWorkflowClientForController{
+		triggerWithSourceFunc: func(ctx context.Context, t *tenant.Tenant, action, source string) (string, error) {
+			triggerCount++
+			return "exec-new", nil
+		},
+		getStatusFunc: func(ctx context.Context, executionID string) (*workflow.ExecutionStatus, error) {
+			// Return running state - should be skipped
+			return &workflow.ExecutionStatus{
+				ExecutionID: executionID,
+				State:       workflow.StateRunning,
+			}, nil
+		},
+	}
+
+	tenantRepo := &mockTenantRepository{
+		getTenantByIDFunc: func(ctx context.Context, id uuid.UUID) (*tenant.Tenant, error) {
+			return activeTenant, nil
+		},
+	}
+
+	reconciler := &Reconciler{
+		tenantRepo:     tenantRepo,
+		workflowClient: wfClient,
+		logger:         logger,
+		ctx:            context.Background(),
+	}
+
+	err := reconciler.reconcile(activeTenant.ID.String())
+	if err != nil {
+		t.Errorf("reconcile should not fail: %v", err)
+	}
+
+	// Should not trigger new workflow
+	if triggerCount != 0 {
+		t.Errorf("expected no trigger for active workflow, got %d triggers", triggerCount)
+	}
+}
+
+// TestControllerUpdatesAfterCompletion tests controller updates tenant after workflow completion
+func TestControllerUpdatesAfterCompletion(t *testing.T) {
+	logger, _ := zap.NewDevelopment()
+
+	completedTenant := &tenant.Tenant{
+		ID:                  uuid.New(),
+		Name:                "test-tenant",
+		Status:              tenant.StatusProvisioning,
+		WorkflowExecutionID: stringPtr("exec-completed-123"),
+	}
+
+	triggerCount := 0
+	updatedStatus := tenant.Status("")
+	var updatedExecutionID *string
+	wfClient := &mockWorkflowClientForController{
+		triggerWithSourceFunc: func(ctx context.Context, t *tenant.Tenant, action, source string) (string, error) {
+			triggerCount++
+			return "exec-new", nil
+		},
+		getStatusFunc: func(ctx context.Context, executionID string) (*workflow.ExecutionStatus, error) {
+			// Return succeeded state - should trigger new execution
+			return &workflow.ExecutionStatus{
+				ExecutionID: executionID,
+				State:       workflow.StateSucceeded,
+			}, nil
+		},
+	}
+
+	tenantRepo := &mockTenantRepository{
+		getTenantByIDFunc: func(ctx context.Context, id uuid.UUID) (*tenant.Tenant, error) {
+			return completedTenant, nil
+		},
+		updateTenantFunc: func(ctx context.Context, t *tenant.Tenant) error {
+			updatedStatus = t.Status
+			updatedExecutionID = t.WorkflowExecutionID
+			return nil
+		},
+	}
+
+	reconciler := &Reconciler{
+		tenantRepo:     tenantRepo,
+		workflowClient: wfClient,
+		logger:         logger,
+		ctx:            context.Background(),
+	}
+
+	err := reconciler.reconcile(completedTenant.ID.String())
+	if err != nil {
+		t.Errorf("reconcile should not fail: %v", err)
+	}
+
+	// Should update tenant and not trigger new workflow
+	if triggerCount != 0 {
+		t.Errorf("expected no trigger after completion, got %d triggers", triggerCount)
+	}
+	if updatedStatus != tenant.StatusReady {
+		t.Errorf("expected status ready after completion, got %s", updatedStatus)
+	}
+	if updatedExecutionID == nil || *updatedExecutionID != "exec-completed-123" {
+		t.Errorf("expected workflow execution ID to be preserved, got %v", updatedExecutionID)
+	}
+}
+
+// TestControllerUpdatesAfterFailure tests controller marks tenant failed after workflow failure
+func TestControllerUpdatesAfterFailure(t *testing.T) {
+	logger, _ := zap.NewDevelopment()
+
+	failedTenant := &tenant.Tenant{
+		ID:                  uuid.New(),
+		Name:                "test-tenant",
+		Status:              tenant.StatusProvisioning,
+		WorkflowExecutionID: stringPtr("exec-failed-123"),
+	}
+
+	triggerCount := 0
+	updatedStatus := tenant.Status("")
+	wfClient := &mockWorkflowClientForController{
+		triggerWithSourceFunc: func(ctx context.Context, t *tenant.Tenant, action, source string) (string, error) {
+			triggerCount++
+			return "exec-retry", nil
+		},
+		getStatusFunc: func(ctx context.Context, executionID string) (*workflow.ExecutionStatus, error) {
+			// Return failed state - should trigger new execution
+			return &workflow.ExecutionStatus{
+				ExecutionID: executionID,
+				State:       workflow.StateFailed,
+			}, nil
+		},
+	}
+
+	tenantRepo := &mockTenantRepository{
+		getTenantByIDFunc: func(ctx context.Context, id uuid.UUID) (*tenant.Tenant, error) {
+			return failedTenant, nil
+		},
+		updateTenantFunc: func(ctx context.Context, t *tenant.Tenant) error {
+			updatedStatus = t.Status
+			return nil
+		},
+	}
+
+	reconciler := &Reconciler{
+		tenantRepo:     tenantRepo,
+		workflowClient: wfClient,
+		logger:         logger,
+		ctx:            context.Background(),
+	}
+
+	err := reconciler.reconcile(failedTenant.ID.String())
+	if err != nil {
+		t.Errorf("reconcile should not fail: %v", err)
+	}
+
+	// Should update tenant and not trigger new workflow
+	if triggerCount != 0 {
+		t.Errorf("expected no trigger after failure, got %d triggers", triggerCount)
+	}
+	if updatedStatus != tenant.StatusFailed {
+		t.Errorf("expected status failed after failure, got %s", updatedStatus)
+	}
+}
+
+func TestControllerDeletesAfterDeleteWorkflowSuccess(t *testing.T) {
+	logger, _ := zap.NewDevelopment()
+
+	deletingTenant := &tenant.Tenant{
+		ID:                  uuid.New(),
+		Name:                "delete-tenant",
+		Status:              tenant.StatusDeleting,
+		WorkflowExecutionID: stringPtr("exec-delete-123"),
+	}
+
+	deleted := false
+	wfClient := &mockWorkflowClientForController{
+		getStatusFunc: func(ctx context.Context, executionID string) (*workflow.ExecutionStatus, error) {
+			return &workflow.ExecutionStatus{
+				ExecutionID: executionID,
+				State:       workflow.StateSucceeded,
+			}, nil
+		},
+	}
+
+	tenantRepo := &mockTenantRepository{
+		getTenantByIDFunc: func(ctx context.Context, id uuid.UUID) (*tenant.Tenant, error) {
+			return deletingTenant, nil
+		},
+		deleteTenantFunc: func(ctx context.Context, id uuid.UUID) error {
+			deleted = true
+			return nil
+		},
+		updateTenantFunc: func(ctx context.Context, tenantValue *tenant.Tenant) error {
+			t.Fatalf("unexpected update for deleting tenant")
+			return nil
+		},
+	}
+
+	reconciler := &Reconciler{
+		tenantRepo:     tenantRepo,
+		workflowClient: wfClient,
+		logger:         logger,
+		ctx:            context.Background(),
+	}
+
+	err := reconciler.reconcile(deletingTenant.ID.String())
+	if err != nil {
+		t.Errorf("reconcile should not fail: %v", err)
+	}
+
+	if !deleted {
+		t.Errorf("expected tenant to be deleted after workflow success")
+	}
+}
+
+// TestControllerSkipsPendingWorkflow tests controller skips pending workflows
+func TestControllerSkipsPendingWorkflow(t *testing.T) {
+	logger, _ := zap.NewDevelopment()
+
+	pendingTenant := &tenant.Tenant{
+		ID:                  uuid.New(),
+		Name:                "test-tenant",
+		Status:              tenant.StatusProvisioning,
+		WorkflowExecutionID: stringPtr("exec-pending-123"),
+	}
+
+	triggerCount := 0
+	wfClient := &mockWorkflowClientForController{
+		triggerWithSourceFunc: func(ctx context.Context, t *tenant.Tenant, action, source string) (string, error) {
+			triggerCount++
+			return "exec-new", nil
+		},
+		getStatusFunc: func(ctx context.Context, executionID string) (*workflow.ExecutionStatus, error) {
+			// Return pending state - should be skipped
+			return &workflow.ExecutionStatus{
+				ExecutionID: executionID,
+				State:       workflow.StatePending,
+			}, nil
+		},
+	}
+
+	tenantRepo := &mockTenantRepository{
+		getTenantByIDFunc: func(ctx context.Context, id uuid.UUID) (*tenant.Tenant, error) {
+			return pendingTenant, nil
+		},
+	}
+
+	reconciler := &Reconciler{
+		tenantRepo:     tenantRepo,
+		workflowClient: wfClient,
+		logger:         logger,
+		ctx:            context.Background(),
+	}
+
+	err := reconciler.reconcile(pendingTenant.ID.String())
+	if err != nil {
+		t.Errorf("reconcile should not fail: %v", err)
+	}
+
+	// Should not trigger for pending workflow
+	if triggerCount != 0 {
+		t.Errorf("expected no trigger for pending workflow, got %d triggers", triggerCount)
+	}
+}
+
+// TestControllerTriggersWithControllerSource tests controller passes trigger_source=controller
+func TestControllerTriggersWithControllerSource(t *testing.T) {
+	logger, _ := zap.NewDevelopment()
+
+	requestedTenant := &tenant.Tenant{
+		ID:     uuid.New(),
+		Name:   "test-tenant",
+		Status: tenant.StatusRequested,
+	}
+
+	capturedSource := ""
+	wfClient := &mockWorkflowClientForController{
+		triggerWithSourceFunc: func(ctx context.Context, t *tenant.Tenant, action, source string) (string, error) {
+			capturedSource = source
+			return "exec-123", nil
+		},
+	}
+
+	tenantRepo := &mockTenantRepository{
+		getTenantByIDFunc: func(ctx context.Context, id uuid.UUID) (*tenant.Tenant, error) {
+			return requestedTenant, nil
+		},
+	}
+
+	reconciler := &Reconciler{
+		tenantRepo:     tenantRepo,
+		workflowClient: wfClient,
+		logger:         logger,
+		ctx:            context.Background(),
+	}
+
+	err := reconciler.reconcile(requestedTenant.ID.String())
+	if err != nil {
+		t.Errorf("reconcile should not fail: %v", err)
+	}
+
+	// Verify trigger source was "controller"
+	if capturedSource != "controller" {
+		t.Errorf("expected trigger_source 'controller', got '%s'", capturedSource)
+	}
+}
+
+// TestControllerHandlesStatusCheckFailureGracefully tests controller continues if status check fails
+func TestControllerHandlesStatusCheckFailureGracefully(t *testing.T) {
+	logger, _ := zap.NewDevelopment()
+
+	tenantWithExecution := &tenant.Tenant{
+		ID:                  uuid.New(),
+		Name:                "test-tenant",
+		Status:              tenant.StatusProvisioning,
+		WorkflowExecutionID: stringPtr("exec-unknown-123"),
+	}
+
+	triggerCount := 0
+	wfClient := &mockWorkflowClientForController{
+		triggerWithSourceFunc: func(ctx context.Context, t *tenant.Tenant, action, source string) (string, error) {
+			triggerCount++
+			return "exec-retry", nil
+		},
+		getStatusFunc: func(ctx context.Context, executionID string) (*workflow.ExecutionStatus, error) {
+			// Simulate status check failure
+			return nil, fmt.Errorf("status check failed")
+		},
+	}
+
+	tenantRepo := &mockTenantRepository{
+		getTenantByIDFunc: func(ctx context.Context, id uuid.UUID) (*tenant.Tenant, error) {
+			return tenantWithExecution, nil
+		},
+	}
+
+	reconciler := &Reconciler{
+		tenantRepo:     tenantRepo,
+		workflowClient: wfClient,
+		logger:         logger,
+		ctx:            context.Background(),
+	}
+
+	err := reconciler.reconcile(tenantWithExecution.ID.String())
+	if err != nil {
+		t.Errorf("reconcile should not fail on status check error: %v", err)
+	}
+
+	// Should not trigger workflow on status check failure
+	if triggerCount != 0 {
+		t.Errorf("expected 0 triggers after status check failure, got %d triggers", triggerCount)
+	}
+}
+
+// TestControllerNoExecutionIDTriggers tests controller triggers for tenants without execution ID
+func TestControllerNoExecutionIDTriggers(t *testing.T) {
+	logger, _ := zap.NewDevelopment()
+
+	newTenant := &tenant.Tenant{
+		ID:     uuid.New(),
+		Name:   "test-tenant",
+		Status: tenant.StatusRequested,
+		// No execution ID
+	}
+
+	triggerCount := 0
+	wfClient := &mockWorkflowClientForController{
+		triggerWithSourceFunc: func(ctx context.Context, t *tenant.Tenant, action, source string) (string, error) {
+			triggerCount++
+			return "exec-123", nil
+		},
+	}
+
+	tenantRepo := &mockTenantRepository{
+		getTenantByIDFunc: func(ctx context.Context, id uuid.UUID) (*tenant.Tenant, error) {
+			return newTenant, nil
+		},
+	}
+
+	reconciler := &Reconciler{
+		tenantRepo:     tenantRepo,
+		workflowClient: wfClient,
+		logger:         logger,
+		ctx:            context.Background(),
+	}
+
+	err := reconciler.reconcile(newTenant.ID.String())
+	if err != nil {
+		t.Errorf("reconcile should not fail: %v", err)
+	}
+
+	// Should trigger for new tenant
+	if triggerCount != 1 {
+		t.Errorf("expected 1 trigger for new tenant, got %d triggers", triggerCount)
+	}
+}
+
+// Helper function
+func stringPtr(s string) *string {
+	return &s
+}

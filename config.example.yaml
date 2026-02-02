@@ -1,0 +1,310 @@
+# Landlord Configuration Example
+# This file documents all available configuration options for the Landlord control plane.
+# Use this as a reference for your actual configuration file.
+# Copy relevant sections to config.yaml and customize for your environment.
+
+################################################################################
+# DATABASE CONFIGURATION
+# =============================================================================#
+
+database:
+  # Database provider: "postgres" (production) or "sqlite" (development/testing)
+  provider: postgres
+  
+  # ============================================================================
+  # PostgreSQL Configuration (use when provider: postgres)
+  # ============================================================================
+  
+  # PostgreSQL host
+  host: localhost
+  
+  # PostgreSQL port
+  port: 5432
+  
+  # PostgreSQL username
+  user: landlord
+  
+  # PostgreSQL password
+  password: landlord_password
+  
+  # PostgreSQL database name
+  database: landlord_db
+  
+  # SSL mode: disable, allow, prefer (default), require, verify-ca, verify-full
+  ssl_mode: prefer
+  
+  # Maximum number of connections in the pool
+  max_connections: 25
+  
+  # Minimum number of connections to keep open
+  min_connections: 5
+  
+  # Timeout for establishing a connection
+  connect_timeout: 10s
+  
+  # Maximum lifetime of a connection before it's recycled
+  max_conn_lifetime: 1h
+  
+  # Maximum idle time before a connection is closed
+  max_conn_idle_time: 30m
+  
+  # ============================================================================
+  # SQLite Configuration (use when provider: sqlite)
+  # Uncomment this section and comment out PostgreSQL above for SQLite
+  # ============================================================================
+  
+  # sqlite:
+  #   # Path to SQLite database file
+  #   # Options:
+  #   #   - ":memory:" for in-memory database (testing/development only, data lost on restart)
+  #   #   - "landlord.db" for local file-based database (relative to working directory)
+  #   #   - "/var/lib/landlord/landlord.db" for absolute path
+  #   path: landlord.db
+  #
+  #   # Busy timeout: how long to wait if database is locked
+  #   # SQLite only allows one writer at a time, so this timeout is important
+  #   busy_timeout: 5s
+
+################################################################################
+# HTTP SERVER CONFIGURATION
+# =============================================================================#
+
+http:
+  # Host to listen on (0.0.0.0 for all interfaces, localhost for local only)
+  host: 0.0.0.0
+  
+  # Port to listen on
+  port: 8080
+  
+  # Read timeout for incoming requests
+  read_timeout: 10s
+  
+  # Write timeout for outgoing responses
+  write_timeout: 10s
+  
+  # Idle timeout for keep-alive connections
+  idle_timeout: 120s
+  
+  # Timeout for graceful shutdown
+  shutdown_timeout: 30s
+
+################################################################################
+# LOGGING CONFIGURATION
+# =============================================================================#
+
+log:
+  # Log level: debug, info (default), warn, error
+  level: info
+  
+  # Log format: json (production), development (human-readable)
+  format: development
+
+################################################################################
+# COMPUTE PROVIDER CONFIGURATION
+# =============================================================================#
+
+compute:
+  # Default compute provider: mock, docker
+  # Used when creating tenants without explicit provider_type
+  default_provider: mock
+  
+  # ============================================================================
+  # Docker Provider Configuration
+  # ============================================================================
+  # Uncomment this section to enable Docker provider
+  
+  # docker:
+  #   # Docker API host/endpoint
+  #   # Options:
+  #   #   - "" (empty): uses default Docker socket location
+  #   #       - Linux: /var/run/docker.sock
+  #   #       - macOS Docker Desktop: /var/run/docker.sock
+  #   #   - "unix:///var/run/docker.sock": explicit Unix socket
+  #   #   - "tcp://localhost:2375": TCP connection (unsecured)
+  #   #   - "tcp://localhost:2376": TCP connection (TLS secured)
+  #   # Can be overridden by DOCKER_HOST environment variable
+  #   host: ""
+  #
+  #   # Docker network name for tenant containers
+  #   # Use "bridge" for isolated networks per container
+  #   # Use "overlay" for swarm mode
+  #   network_name: bridge
+  #
+  #   # Docker network driver
+  #   # Options: bridge, overlay, host, none, custom
+  #   network_driver: bridge
+  #
+  #   # Prefix for container labels and names
+  #   # Container naming pattern: {label_prefix}-tenant-{tenant_id}
+  #   # Example: "landlord-tenant-acme-corp"
+  #   label_prefix: landlord
+
+################################################################################
+# WORKFLOW PROVIDER CONFIGURATION
+# =============================================================================#
+
+workflow:
+  # Default workflow provider: mock, restate, step_functions
+  # Used when creating workflows without explicit provider_type
+  default_provider: mock
+  
+  # ============================================================================
+  # Restate Workflow Provider Configuration
+  # ============================================================================
+  # Uncomment this section to enable Restate provider
+  
+  # restate:
+  #   # Restate API endpoint URL
+  #   # Local development: http://localhost:8080
+  #   # Docker Compose: http://restate:8080
+  #   # Production: https://restate.example.com:8080
+  #   endpoint: http://localhost:8080
+  #
+  #   # Restate admin endpoint (used for registration)
+  #   admin_endpoint: http://localhost:9070
+  #
+  #   # Worker registration settings
+  #   worker_register_on_startup: true
+  #   worker_admin_endpoint: http://localhost:9070
+  #   worker_namespace: ""
+  #   worker_service_prefix: ""
+  #   worker_landlord_api_url: http://localhost:8080
+  #   worker_compute_provider: mock
+  #   worker_compute_cache_ttl: 5m
+  #   worker_advertised_url: http://localhost:9080/
+  #
+  #   # Authentication token for Restate API (if required)
+  #   # Can be overridden by RESTATE_AUTH_TOKEN environment variable
+  #   auth_token: ""
+  #
+  #   # Execution mechanism: direct or lambda
+  #   # - direct: Execute workflows directly via Restate API
+  #   # - lambda: Execute workflows via AWS Lambda (requires AWS credentials)
+  #   execution_mechanism: direct
+  
+  # ============================================================================
+  # AWS Step Functions Workflow Provider Configuration
+  # ============================================================================
+  # Uncomment this section to enable Step Functions provider
+  
+  # step_functions:
+  #   # AWS region where Step Functions state machines are deployed
+  #   region: us-west-2
+  #
+  #   # IAM role ARN for Step Functions execution
+  #   # REQUIRED if step_functions provider is used
+  #   # Example: arn:aws:iam::123456789012:role/LandlordStepFunctionsRole
+  #   role_arn: ""
+
+################################################################################
+# CONTROLLER CONFIGURATION
+# =============================================================================#
+
+controller:
+  # Enable the reconciliation controller
+  enabled: true
+
+  # Reconciliation polling interval for new workflow invocations
+  reconciliation_interval: 10s
+
+  # Status polling interval for in-flight workflows
+  # If omitted, defaults to reconciliation_interval
+  status_poll_interval: 10s
+
+  # Number of concurrent reconciliation workers
+  workers: 3
+
+  # Workflow trigger timeout per tenant
+  workflow_trigger_timeout: 30s
+
+  # Controller shutdown timeout
+  shutdown_timeout: 30s
+
+  # Maximum retries before marking a tenant as failed
+  max_retries: 5
+
+  # Optional override for workflow provider used by the controller
+  # If empty, workflow.default_provider is used.
+  workflow_provider: ""
+
+################################################################################
+# EXAMPLE: Local Development Configuration
+# =============================================================================#
+# For local development with Docker Compose:
+#
+# compute:
+#   default_provider: docker
+#   docker:
+#     host: ""  # Uses Docker socket
+#     network_name: bridge
+#     network_driver: bridge
+#     label_prefix: landlord
+#
+# workflow:
+#   default_provider: restate
+#   restate:
+#     endpoint: http://restate:8080
+#     execution_mechanism: direct
+#
+# database:
+#   provider: postgres
+#   host: postgres
+#   port: 5432
+#   user: landlord
+#   password: landlord_password
+#   database: landlord_db
+#   ssl_mode: disable
+#   max_connections: 25
+#   min_connections: 5
+
+################################################################################
+# EXAMPLE: Production Configuration
+# =============================================================================#
+# For production deployment with AWS:
+#
+# compute:
+#   default_provider: docker
+#   docker:
+#     host: unix:///var/run/docker.sock
+#     network_name: overlay
+#     network_driver: overlay
+#     label_prefix: landlord
+#
+# workflow:
+#   default_provider: step_functions
+#   step_functions:
+#     region: us-east-1
+#     role_arn: arn:aws:iam::ACCOUNT:role/LandlordStepFunctions
+#
+# database:
+#   provider: postgres
+#   host: landlord-db.rds.amazonaws.com
+#   port: 5432
+#   user: landlord
+#   password: ${DB_PASSWORD}  # Load from environment variable
+#   database: landlord
+#   ssl_mode: require
+#   max_connections: 50
+#   min_connections: 10
+#   max_conn_lifetime: 30m
+
+################################################################################
+# EXAMPLE: Testing Configuration
+# =============================================================================#
+# For automated testing:
+#
+# compute:
+#   default_provider: mock
+#
+# workflow:
+#   default_provider: mock
+#
+# database:
+#   provider: sqlite
+#   sqlite:
+#     path: ":memory:"
+#     busy_timeout: 5s
+#
+# log:
+#   level: debug
+#   format: json

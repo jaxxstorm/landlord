@@ -1,0 +1,112 @@
+
+
+version: 1
+
+context: |
+  Project: landlord
+  Summary:
+    Landlord is an open-source tenant provisioning control plane. It provides a
+    declarative, idempotent API for creating, managing, and reconciling long-lived
+    tenants backed by cloud compute, workflow orchestration, and persistent state.
+
+  Core goals:
+    - Go-based API/control plane for tenant lifecycle management
+    - Declarative desired-state definitions (users declare what they want, not how)
+    - Durable state tracking in a database (tenants, transitions, audit history)
+    - Plan-based orchestration via pluggable workflow engines (failure-tolerant)
+    - Compute provisioning via pluggable compute engines
+    - Reconciliation, drift detection, safe retries, and end-to-end status tracking via API
+
+  Non-goals (for now):
+    - UI/dashboard
+    - Billing/metering
+    - Complex RBAC/SSO (basic auth or stubs acceptable initially)
+    - Multi-region active/active orchestration
+
+  Architecture:
+    - Clean architecture / ports-and-adapters
+    - API layer: validates input, calls domain/services, exposes read APIs for status/history
+    - Domain layer: tenant model, invariants, state transitions, desired vs observed state
+    - Planner: compares desired state to observed state and produces an execution plan
+    - Workflow engine (pluggable): executes plans; handles retries, partial failure, long-running orchestration
+    - Compute engine (pluggable): provisions runtime (containers, config, secrets)
+    - Persistence layer (pluggable): stores tenants, transitions, audit history in a durable DB
+
+  Initial implementations:
+    - Database: PostgreSQL
+    - Workflow engine: AWS Step Functions
+    - Compute engine: AWS ECS
+    - Future targets: Temporal (workflow), Kubernetes/Nomad (compute)
+
+  Domain model:
+    Tenant:
+      - Stable, immutable Tenant ID
+      - Desired state (e.g., images, compute target, configuration, container set)
+      - Observed state (what currently exists in compute/workflow/persistence)
+      - Lifecycle status and timestamps
+      - Full audit trail of changes and transitions
+    Tenants are reconciled toward desired state over time.
+
+  Lifecycle requirements:
+    - Lifecycle states exist (exact names may evolve in specs)
+    - All transitions must be explicit, auditable, and idempotent
+    - State changes must be traceable (who/when/why)
+    - Failure is first-class: partial failures, retries, and recovery paths are explicit in specs
+
+  Tenants and compute:
+    - Tenants may be multi-container (a defined set of containers and config)
+    - Tenants are generally similar with per-tenant config differences
+    - Secrets must follow compute-engine best practices (ECS today; others later)
+
+  Implementation conventions:
+    - Language: Go
+    - HTTP framework: chi
+    - CLI + env config: alecthomas/kong
+    - Logging: uber/zap
+      - Local development: console-friendly logs
+      - Production: JSON logs
+    - Error handling: errors bubble to the CLI level for consistent user messaging
+    - Local dev: always run via `go run .` (avoid building binaries that need cleanup)
+
+  Testing strategy:
+    - Write unit tests first, then define methods
+    - Prefer interfaces and dependency injection to keep ports/adapters testable
+
+rules:
+  specs:
+    - Specs are the source of truth; code must follow specs.
+    - Use clear MUST/SHOULD/MAY language for requirements.
+    - Every spec change should explicitly state impact on:
+      - API behavior
+      - state model / transitions
+      - persistence schema (if applicable)
+      - workflow semantics (retries, compensation, idempotency)
+      - compute semantics (containers, secrets, config)
+    - Avoid defining final lifecycle state names unless required by the change;
+      prefer describing allowed transitions and invariants.
+
+  changes:
+    - Each change must include:
+      - Motivation / problem statement
+      - Proposed behavior (normative)
+      - Idempotency + retry semantics
+      - Failure modes and recovery/compensation expectations
+      - Observability/audit requirements (events/logs/state transitions)
+      - Test plan (unit tests first)
+
+  api:
+    - APIs should support end-to-end status tracking for tenant creation and updates.
+    - Read APIs must expose current status plus history/audit trail.
+    - All mutating operations must be idempotent.
+
+  workflows:
+    - Workflow engines must tolerate retries and partial failures.
+    - Workflows should be safe to resume/replay without duplicating side effects.
+    - Define explicit step boundaries and validation/wait points where needed.
+
+  persistence:
+    - Persistence must record:
+      - tenant desired state revisions
+      - observed state snapshots (or references)
+      - state transitions with timestamps and actor metadata
+      - audit history sufficient for debugging and compliance

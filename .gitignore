@@ -1,0 +1,17 @@
+landlord
+# Build artifacts
+/bin
+/dist
+
+# Dependencies
+vendor/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store

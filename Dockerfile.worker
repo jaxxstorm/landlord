@@ -1,0 +1,47 @@
+# syntax=docker/dockerfile:1
+
+# Build stage
+FROM golang:1.25-alpine AS builder
+
+# Install build dependencies
+WORKDIR /build
+
+# Download dependencies
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copy source code
+COPY . .
+
+# Build the worker binary
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+    -ldflags="-s -w" \
+    -o worker \
+    ./cmd/workers/restate
+
+# Runtime stage
+FROM debian:bookworm-slim AS runtime
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user
+RUN useradd -r -u 65532 -s /bin/false nonroot
+
+# Set working directory
+WORKDIR /app
+
+# Copy binary from builder
+COPY --from=builder /build/worker .
+
+# Expose worker port (Restate service endpoint)
+EXPOSE 9080
+
+# Run as non-root (but we override with user:0 in compose for Docker socket access)
+USER nonroot
+
+# Start the worker
+ENTRYPOINT ["/app/worker"]

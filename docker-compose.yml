@@ -1,0 +1,127 @@
+services:
+  # PostgreSQL Database - Persistent storage for Landlord
+  postgres:
+    image: postgres:15-alpine
+    container_name: landlord-postgres
+    environment:
+      POSTGRES_USER: landlord
+      POSTGRES_PASSWORD: landlord_password
+      POSTGRES_DB: landlord_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - landlord_postgres_data:/var/lib/postgresql/data
+      - ./scripts/postgres-init.sql:/docker-entrypoint-initdb.d/01-init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U landlord -d landlord_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - landlord-network
+    command:
+      - "postgres"
+      - "-c"
+      - "max_connections=50"
+      - "-c"
+      - "log_statement=all"
+      - "-c"
+      - "log_duration=on"
+
+  # Restate Workflow Engine
+  restate:
+    image: ghcr.io/restatedev/restate:latest
+    container_name: landlord-restate
+    environment:
+      RESTATE_LOGGING__FORMAT: compact
+      RESTATE_LOGGING__LEVEL: info
+    ports:
+      - "8080:8080"      # Ingress endpoint
+      - "9070:9070"      # Admin endpoint
+    volumes:
+      - restate-data:/tmp/restate-data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9070/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
+    networks:
+      - landlord-network
+    depends_on:
+      - postgres
+
+  # Landlord Control Plane
+  landlord:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    container_name: landlord-api
+    user: "0"
+    environment:
+      LANDLORD_CONFIG: /etc/landlord/test.config.yaml
+      DOCKER_HOST: unix:///var/run/docker.sock
+      LOG_LEVEL: debug
+    ports:
+      - "8081:8080"
+    volumes:
+      # Mount test configuration
+      - ./test.config.yaml:/etc/landlord/test.config.yaml:ro
+      
+      # Mount Docker socket for in-container Docker access
+      # This allows Landlord to provision containers on the host
+      - /var/run/docker.sock:/var/run/docker.sock:rw
+    depends_on:
+      postgres:
+        condition: service_healthy
+      restate:
+        condition: service_healthy
+    networks:
+      - landlord-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # Landlord Workflow Worker
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+      target: runtime
+    container_name: landlord-worker
+    user: "0"
+    environment:
+      LANDLORD_CONFIG: /etc/landlord/test.config.yaml
+      DOCKER_HOST: unix:///var/run/docker.sock
+      LOG_LEVEL: debug
+      PORT: "9080"
+    volumes:
+      # Mount test configuration
+      - ./test.config.yaml:/etc/landlord/test.config.yaml:ro
+      
+      # Mount Docker socket for in-container Docker access
+      - /var/run/docker.sock:/var/run/docker.sock:rw
+    depends_on:
+      postgres:
+        condition: service_healthy
+      restate:
+        condition: service_healthy
+    networks:
+      - landlord-network
+
+volumes:
+  landlord_postgres_data:
+    driver: local
+  restate-data:
+
+networks:
+  landlord-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16

@@ -1,0 +1,59 @@
+# Docker Compose Test Configuration
+# Minimal configuration for local development and testing via docker-compose
+# This file is mounted inside the Landlord container in docker-compose.yml
+
+database:
+  provider: postgres
+  host: postgres
+  port: 5432
+  user: landlord
+  password: landlord_password
+  database: landlord_db
+  ssl_mode: disable
+  max_connections: 25
+  min_connections: 5
+  connect_timeout: 10s
+  max_conn_lifetime: 1h
+  max_conn_idle_time: 30m
+
+http:
+  host: 0.0.0.0
+  port: 8080
+  read_timeout: 10s
+  write_timeout: 10s
+  idle_timeout: 120s
+  shutdown_timeout: 30s
+
+log:
+  level: debug
+  format: development
+
+compute:
+  default_provider: docker
+  docker:
+    host: ""
+    network_name: bridge
+    network_driver: bridge
+    label_prefix: landlord
+
+workflow:
+  default_provider: restate
+  restate:
+    endpoint: http://restate:8080
+    admin_endpoint: http://restate:9070
+    worker_advertised_url: http://worker:9080/
+    service_name: TenantProvisioning
+    execution_mechanism: local
+    auth_type: none
+    timeout: 30m
+    retry_attempts: 3
+
+controller:
+  enabled: true
+  reconciliation_interval: 10s
+  status_poll_interval: 10s
+  workers: 3
+  workflow_trigger_timeout: 30s
+  shutdown_timeout: 30s
+  max_retries: 5
+  workflow_provider: ""

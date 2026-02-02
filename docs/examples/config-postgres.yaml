@@ -1,0 +1,43 @@
+# Landlord Configuration - PostgreSQL Provider
+# This is the default and recommended provider for production deployments
+
+# HTTP Server Configuration
+http:
+  addr: ":8080"
+  shutdownTimeout: 30s
+
+# Database Configuration - PostgreSQL
+database:
+  # Provider selection
+  provider: postgres
+  
+  # PostgreSQL connection details
+  host: localhost
+  port: 5432
+  user: landlord
+  password: secure_password_here
+  database: landlord_db
+  
+  # SSL mode for connections
+  sslMode: prefer
+  
+  # Connection pool tuning
+  maxConnections: 25
+  minConnections: 5
+  connectTimeout: 10s
+  maxConnLifetime: 1h
+  maxConnIdleTime: 30m
+
+# Logging Configuration
+log:
+  level: info
+  format: json
+  development: false
+
+# Compute Configuration
+compute:
+  defaultProvider: docker
+
+# Workflow Configuration  
+workflow:
+  defaultProvider: restate

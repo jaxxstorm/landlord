@@ -127,6 +127,15 @@ definitions:
         description: WorkflowExecutionID is the ID of the current or last workflow
           execution
         type: string
+      workflow_error_message:
+        description: WorkflowErrorMessage is the latest workflow error message
+        type: string
+      workflow_retry_count:
+        description: WorkflowRetryCount is the number of workflow retry attempts
+        type: integer
+      workflow_sub_state:
+        description: WorkflowSubState is the provider-agnostic execution sub-state
+        type: string
     type: object
   models.UpdateTenantRequest:
     properties:
@@ -216,6 +225,18 @@ paths:
         in: query
         name: include_deleted
         type: boolean
+      - description: Filter by workflow sub-state (comma-separated)
+        in: query
+        name: workflow_sub_state
+        type: string
+      - description: Filter tenants with workflow errors
+        in: query
+        name: has_workflow_error
+        type: boolean
+      - description: Minimum workflow retry count
+        in: query
+        name: min_retry_count
+        type: integer
       produces:
       - application/json
       responses:

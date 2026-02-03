@@ -46,6 +46,37 @@ go run ./cmd/cli create --tenant-name demo-tenant \
   --config '{"image":"nginx:alpine"}'
 ```
 
+Multi-line JSON example:
+
+```bash
+go run ./cmd/cli create --tenant-name demo-tenant \
+  --config '{
+    "image": "nginx:alpine",
+    "env": {
+      "FOO": "bar"
+    },
+    "ports": [
+      {
+        "container_port": 8080
+      }
+    ]
+  }'
+```
+
+YAML example:
+
+```bash
+go run ./cmd/cli create --tenant-name demo-tenant \
+  --config 'image: "nginx:alpine"\nenv:\n  FOO: "bar"\nports:\n  - container_port: 8080'
+```
+
+File example:
+
+```bash
+go run ./cmd/cli create --tenant-name demo-tenant \
+  --config file:///path/to/compute-config.yaml
+```
+
 ## 4. Inspect tenant state
 
 ```bash

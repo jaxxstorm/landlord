@@ -10,6 +10,14 @@ Compute providers provision the runtime resources for tenants (containers, netwo
 | docker | Local development and simple deployments | Uses Docker Engine for container provisioning |
 | mock | Tests and demos | In-memory, no real infrastructure |
 
+## Provider documentation
+
+- Docker: `compute/docker/README.md`
+- ECS: `compute/ecs/README.md`
+- Mock: `compute/mock/README.md`
+
+Each provider doc includes a complete compute_config reference with multi-line JSON and YAML examples.
+
 ## Configuration example
 
 ```yaml

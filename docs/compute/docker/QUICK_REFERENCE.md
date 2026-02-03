@@ -20,28 +20,98 @@ docker run -v /var/run/docker.sock:/var/run/docker.sock \
   landlord:latest
 ```
 
-### 3. Provision a Tenant
+### 3. Create a Tenant
 
 ```bash
-curl -X POST http://localhost:8080/tenants \
-  -H "Content-Type: application/json" \
-  -d '{
-    "tenant_id": "my-app",
-    "provider_type": "docker",
-    "containers": [{
-      "name": "web",
-      "image": "nginx:alpine",
-      "ports": [{
+go run ./cmd/cli create --tenant-name my-app \
+  --config '{
+    "image": "nginx:alpine",
+    "env": {
+      "FOO": "bar"
+    },
+    "ports": [
+      {
         "container_port": 80,
         "host_port": 8080,
         "protocol": "tcp"
-      }]
-    }],
-    "resources": {
-      "cpu": 1000,
-      "memory": 512
-    }
+      }
+    ]
   }'
+```
+
+Or load from a file:
+
+```bash
+go run ./cmd/cli create --tenant-name my-app \
+  --config file:///path/to/docker-compute-config.yaml
+```
+
+## Tenant compute_config reference
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `image` | string | yes | Container image reference |
+| `env` | object<string,string> | no | Environment variables to set in the container |
+| `volumes` | array<string> | no | Volume mounts (`host_path:container_path` or `host_path:container_path:mode`) |
+| `network_mode` | string | no | Network mode (`bridge`, `host`, `none`, or `container:<name|id>`) |
+| `ports` | array<object> | no | Port mappings (see `ports` fields below) |
+| `restart_policy` | string | no | Restart policy (`no`, `always`, `on-failure`, `unless-stopped`) |
+| `labels` | object<string,string> | no | Docker container labels |
+
+### `ports` fields
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `container_port` | integer | yes | Container port (1-65535) |
+| `host_port` | integer | no | Host port (1-65535) |
+| `protocol` | string | no | Protocol (`tcp` or `udp`) |
+
+### Full JSON example
+
+```json
+{
+  "image": "nginx:1.25",
+  "env": {
+    "FOO": "bar",
+    "DEBUG": "true"
+  },
+  "volumes": [
+    "/data:/app/data",
+    "/logs:/app/logs:ro"
+  ],
+  "network_mode": "bridge",
+  "ports": [
+    {
+      "container_port": 8080,
+      "host_port": 8080,
+      "protocol": "tcp"
+    }
+  ],
+  "restart_policy": "unless-stopped",
+  "labels": {
+    "com.example.owner": "platform"
+  }
+}
+```
+
+### Full YAML example
+
+```yaml
+image: "nginx:1.25"
+env:
+  FOO: "bar"
+  DEBUG: "true"
+volumes:
+  - "/data:/app/data"
+  - "/logs:/app/logs:ro"
+network_mode: "bridge"
+ports:
+  - container_port: 8080
+    host_port: 8080
+    protocol: "tcp"
+restart_policy: "unless-stopped"
+labels:
+  com.example.owner: "platform"
 ```
 
 ## API Endpoints

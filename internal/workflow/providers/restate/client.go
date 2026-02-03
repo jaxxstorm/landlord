@@ -288,15 +288,19 @@ func (c *Client) GetExecutionStatus(ctx context.Context, executionID string) (*w
 	// Map Restate invocation status to workflow status
 	state := workflow.StateRunning
 	if status, ok := invocation["status"].(string); ok {
-		normalized := strings.ToLower(status)
-		switch {
-		case strings.Contains(normalized, "completed"), strings.Contains(normalized, "succeeded"), strings.Contains(normalized, "success"):
+		normalized := strings.ToLower(strings.TrimSpace(status))
+		switch normalized {
+		case "completed", "succeeded", "success":
 			state = workflow.StateSucceeded
-		case strings.Contains(normalized, "failed"), strings.Contains(normalized, "error"):
+		case "failed", "error":
 			state = workflow.StateFailed
-		case strings.Contains(normalized, "pending"):
+		case "pending":
 			state = workflow.StatePending
-		case strings.Contains(normalized, "running"), strings.Contains(normalized, "active"), strings.Contains(normalized, "suspended"):
+		case "running", "active", "suspended", "backing-off", "backoff", "retrying", "retry":
+			// backing-off, suspended, etc. are all considered "running" at the state level
+			// Sub-state differentiation happens in mapInvocationSubState
+			state = workflow.StateRunning
+		default:
 			state = workflow.StateRunning
 		}
 	}
@@ -308,6 +312,31 @@ func (c *Client) GetExecutionStatus(ctx context.Context, executionID string) (*w
 		StartTime:    time.Now(), // TODO: parse from invocation
 		Input:        json.RawMessage(`{}`),
 	}
+
+	metadata := extractInvocationMetadata(invocation)
+	
+	c.logger.Info("extracted metadata from invocation", zap.Any("metadata", metadata))
+	
+	// Also extract the canonical sub-state and store it in metadata for ExtractWorkflowDetails
+	if statusStr, ok := invocation["status"].(string); ok {
+		subState := mapInvocationSubState(statusStr)
+		c.logger.Info("mapped invocation sub-state", 
+			zap.String("status_string", statusStr),
+			zap.String("sub_state", string(subState)))
+		if metadata == nil {
+			metadata = make(map[string]string)
+		}
+		metadata["workflow_sub_state"] = string(subState)
+	}
+	
+	if len(metadata) > 0 {
+		status.Metadata = metadata
+	}
+
+	c.logger.Info("client returning execution status",
+		zap.String("execution_id", executionID),
+		zap.String("state", string(status.State)),
+		zap.Any("metadata", status.Metadata))
 
 	if output, ok := invocation["output"]; ok {
 		if raw, err := json.Marshal(output); err == nil {
@@ -390,6 +419,10 @@ func (c *Client) getExecutionStatusByIdempotencyKey(ctx context.Context, idempot
 		StartTime:    time.Now(),
 	}
 
+	if metadata := extractInvocationMetadata(response); len(metadata) > 0 {
+		status.Metadata = metadata
+	}
+
 	if output, ok := response["output"]; ok {
 		if raw, err := json.Marshal(output); err == nil {
 			status.Output = raw
@@ -451,12 +484,15 @@ func (c *Client) queryInvocationStatus(ctx context.Context, executionID string) 
 		return nil, fmt.Errorf("failed to decode query response: %w", err)
 	}
 
+	c.logger.Info("raw invocation query response", zap.Any("response", response))
+
 	if rows, ok := response["rows"].([]interface{}); ok {
 		if len(rows) == 0 {
 			return nil, fmt.Errorf("%w: execution not found", workflow.ErrExecutionNotFound)
 		}
 
 		if rowMap, ok := rows[0].(map[string]interface{}); ok {
+			c.logger.Info("invocation data from row map", zap.Any("invocation", rowMap))
 			return rowMap, nil
 		}
 
@@ -472,6 +508,7 @@ func (c *Client) queryInvocationStatus(ctx context.Context, executionID string) 
 						invocation[name] = rowSlice[i]
 					}
 				}
+				c.logger.Info("invocation data from row slice", zap.Any("invocation", invocation))
 				return invocation, nil
 			}
 		}

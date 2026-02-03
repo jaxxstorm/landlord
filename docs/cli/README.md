@@ -4,7 +4,7 @@ This CLI interacts with the Landlord API. You can point it at a specific API URL
 
 ## Create a tenant
 
-Create a tenant with compute config (required):
+Create a tenant with compute config (required). `--config` accepts JSON or YAML, inline or from a file path, including `file://` URIs.
 
 ```bash
 go run . create --tenant-name lbr \
@@ -17,6 +17,22 @@ Include compute configuration (provider-specific) with `--config` as JSON. Examp
 go run . create \
   --tenant-name lbr \
   --config '{"image":"nginx:latest","env":{"FOO":"bar"},"ports":[{"container_port":8080}]}'
+```
+
+YAML example:
+
+```bash
+go run . create \
+  --tenant-name lbr \
+  --config 'image: "nginx:latest"\nenv:\n  FOO: "bar"\nports:\n  - container_port: 8080'
+```
+
+File example:
+
+```bash
+go run . create \
+  --tenant-name lbr \
+  --config file:///path/to/compute-config.yaml
 ```
 
 ## Archive a tenant
@@ -37,7 +53,7 @@ go run . delete --tenant-name lbr
 
 ## Update a tenant (set)
 
-Modify compute config:
+Modify compute config (`--config` supports JSON, YAML, or file://):
 
 ```bash
 go run . set --tenant-name lbr \

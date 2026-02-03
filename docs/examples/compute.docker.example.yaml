@@ -1,0 +1,16 @@
+# Example tenant compute_config for the Docker provider
+image: "nginx:1.25"
+env:
+  FOO: "bar"
+  DEBUG: "true"
+volumes:
+  - "/data:/app/data"
+  - "/logs:/app/logs:ro"
+network_mode: "bridge"
+ports:
+  - container_port: 8080
+    host_port: 8080
+    protocol: "tcp"
+restart_policy: "unless-stopped"
+labels:
+  com.example.owner: "platform"

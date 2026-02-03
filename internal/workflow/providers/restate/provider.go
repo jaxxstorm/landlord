@@ -319,6 +319,11 @@ func (p *Provider) GetExecutionStatus(ctx context.Context, executionID string) (
 		return nil, fmt.Errorf("failed to get execution status: %w", err)
 	}
 
+	p.logger.Info("provider received execution status from client",
+		zap.String("execution_id", executionID),
+		zap.String("state", string(status.State)),
+		zap.Any("metadata", status.Metadata))
+
 	return status, nil
 }
 

@@ -23,6 +23,30 @@ go run ./cmd/cli create --tenant-name demo-tenant \
   --config '{"image":"nginx:alpine"}'
 ```
 
+Multi-line JSON example:
+
+```bash
+go run ./cmd/cli create --tenant-name demo-tenant \
+  --config '{
+    "image": "nginx:alpine",
+    "env": {
+      "FOO": "bar"
+    },
+    "ports": [
+      {
+        "container_port": 8080
+      }
+    ]
+  }'
+```
+
+YAML example:
+
+```bash
+go run ./cmd/cli create --tenant-name demo-tenant \
+  --config 'image: "nginx:alpine"\nenv:\n  FOO: "bar"\nports:\n  - container_port: 8080'
+```
+
 ## API versioning
 
 All HTTP APIs are versioned with a path prefix. The current stable version is `v1`, so endpoints look like `/v1/tenants` and `/v1/compute/config`.

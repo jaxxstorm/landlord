@@ -122,6 +122,38 @@ func (m *memoryTenantRepo) ListTenants(ctx context.Context, filters tenant.ListF
 		if len(statusFilter) > 0 && !statusFilter[t.Status] {
 			continue
 		}
+		if len(filters.WorkflowSubStates) > 0 {
+			if t.WorkflowSubState == nil {
+				continue
+			}
+			match := false
+			for _, subState := range filters.WorkflowSubStates {
+				if *t.WorkflowSubState == subState {
+					match = true
+					break
+				}
+			}
+			if !match {
+				continue
+			}
+		}
+		if filters.HasWorkflowError != nil {
+			if *filters.HasWorkflowError && (t.WorkflowErrorMessage == nil || *t.WorkflowErrorMessage == "") {
+				continue
+			}
+			if !*filters.HasWorkflowError && t.WorkflowErrorMessage != nil && *t.WorkflowErrorMessage != "" {
+				continue
+			}
+		}
+		if filters.MinRetryCount != nil {
+			count := 0
+			if t.WorkflowRetryCount != nil {
+				count = *t.WorkflowRetryCount
+			}
+			if count < *filters.MinRetryCount {
+				continue
+			}
+		}
 		results = append(results, cloneTenant(t))
 	}
 
@@ -190,6 +222,18 @@ func cloneTenant(t *tenant.Tenant) *tenant.Tenant {
 		id := *t.WorkflowExecutionID
 		clone.WorkflowExecutionID = &id
 	}
+	if t.WorkflowSubState != nil {
+		state := *t.WorkflowSubState
+		clone.WorkflowSubState = &state
+	}
+	if t.WorkflowRetryCount != nil {
+		count := *t.WorkflowRetryCount
+		clone.WorkflowRetryCount = &count
+	}
+	if t.WorkflowErrorMessage != nil {
+		msg := *t.WorkflowErrorMessage
+		clone.WorkflowErrorMessage = &msg
+	}
 	clone.DesiredConfig = copyInterfaceMap(t.DesiredConfig)
 	clone.ObservedConfig = copyInterfaceMap(t.ObservedConfig)
 	clone.Labels = copyStringMap(t.Labels)
@@ -217,6 +261,98 @@ func copyStringMap(input map[string]string) map[string]string {
 		out[k] = v
 	}
 	return out
+}
+
+type stubWorkflowClient struct {
+	execStatus *workflow.ExecutionStatus
+}
+
+func (s *stubWorkflowClient) TriggerWorkflow(ctx context.Context, t *tenant.Tenant, action string) (string, error) {
+	return "exec-stub", nil
+}
+
+func (s *stubWorkflowClient) GetExecutionStatus(ctx context.Context, executionID string) (*workflow.ExecutionStatus, error) {
+	return s.execStatus, nil
+}
+
+func (s *stubWorkflowClient) DetermineAction(status tenant.Status) (string, error) {
+	return "provision", nil
+}
+
+func TestReconciler_UpdatesWorkflowSubStateOnActiveExecution(t *testing.T) {
+	repo := newMemoryTenantRepo()
+	logger := zaptest.NewLogger(t)
+	workflowClient := &stubWorkflowClient{
+		execStatus: &workflow.ExecutionStatus{
+			ExecutionID:  "exec-1",
+			ProviderType: "mock",
+			State:        workflow.StateRunning,
+			Error: &workflow.ExecutionError{
+				Code:    "transient",
+				Message: "temporary failure",
+			},
+			Metadata: map[string]string{
+				"retry_count": "2",
+				"retry_state": "backoff",
+			},
+		},
+	}
+
+	cfg := config.ControllerConfig{
+		Enabled:                true,
+		ReconciliationInterval: 100 * time.Millisecond,
+		StatusPollInterval:     100 * time.Millisecond,
+		Workers:                1,
+		WorkflowTriggerTimeout: 5 * time.Second,
+		ShutdownTimeout:        5 * time.Second,
+		MaxRetries:             1,
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	reconciler := &Reconciler{
+		tenantRepo:     repo,
+		workflowClient: workflowClient,
+		config:         cfg,
+		logger:         logger,
+		retryCount:     make(map[string]int),
+		queue:          NewRateLimitingQueue(),
+		ctx:            ctx,
+		cancel:         cancel,
+	}
+
+	executionID := "exec-1"
+	err := repo.CreateTenant(context.Background(), &tenant.Tenant{
+		ID:                  uuid.New(),
+		Name:                "active-tenant",
+		Status:              tenant.StatusProvisioning,
+		WorkflowExecutionID: &executionID,
+		DesiredConfig: map[string]interface{}{
+			"image": "nginx:latest",
+		},
+	})
+	require.NoError(t, err)
+
+	tenantID := repo.names["active-tenant"].String()
+	err = reconciler.reconcile(tenantID)
+	require.NoError(t, err)
+
+	updated, err := repo.GetTenantByName(context.Background(), "active-tenant")
+	require.NoError(t, err)
+	require.NotNil(t, updated.WorkflowSubState)
+	require.Equal(t, string(workflow.SubStateBackingOff), *updated.WorkflowSubState)
+	require.NotNil(t, updated.WorkflowRetryCount)
+	require.Equal(t, 2, *updated.WorkflowRetryCount)
+	require.NotNil(t, updated.WorkflowErrorMessage)
+	require.Equal(t, "temporary failure", *updated.WorkflowErrorMessage)
+
+	versionAfterFirst := updated.Version
+
+	err = reconciler.reconcile(tenantID)
+	require.NoError(t, err)
+
+	updated, err = repo.GetTenantByName(context.Background(), "active-tenant")
+	require.NoError(t, err)
+	require.Equal(t, versionAfterFirst, updated.Version)
 }
 
 func TestReconciler_InvokesWorkflowForRequestedTenant(t *testing.T) {

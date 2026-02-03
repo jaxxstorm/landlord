@@ -109,39 +109,83 @@ services:
       DOCKER_HOST: tcp://docker-dind:2375
 ```
 
-## Tenant Provisioning
+## Tenant compute_config reference
 
-### Creating a Tenant with Docker Compute
+The `compute_config` object is required when creating or updating a tenant. Docker supports the fields below.
+
+### Fields
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `image` | string | yes | Container image reference |
+| `env` | object<string,string> | no | Environment variables to set in the container |
+| `volumes` | array<string> | no | Volume mounts (`host_path:container_path` or `host_path:container_path:mode`) |
+| `network_mode` | string | no | Network mode (`bridge`, `host`, `none`, or `container:<name|id>`) |
+| `ports` | array<object> | no | Port mappings (see `ports` fields below) |
+| `restart_policy` | string | no | Restart policy (`no`, `always`, `on-failure`, `unless-stopped`) |
+| `labels` | object<string,string> | no | Docker container labels |
+
+### `ports` fields
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `container_port` | integer | yes | Container port (1-65535) |
+| `host_port` | integer | no | Host port (1-65535) |
+| `protocol` | string | no | Protocol (`tcp` or `udp`) |
+
+### Full JSON example
 
 ```json
 {
-  "tenant_id": "acme-corp",
-  "provider_type": "docker",
-  "containers": [
+  "image": "nginx:1.25",
+  "env": {
+    "FOO": "bar",
+    "DEBUG": "true"
+  },
+  "volumes": [
+    "/data:/app/data",
+    "/logs:/app/logs:ro"
+  ],
+  "network_mode": "bridge",
+  "ports": [
     {
-      "name": "app",
-      "image": "myapp:1.0",
-      "command": ["./start.sh"],
-      "args": ["--config=/etc/app/config.yaml"],
-      "env": {
-        "LOG_LEVEL": "debug",
-        "DATABASE_URL": "postgres://db:5432/acme"
-      },
-      "ports": [
-        {
-          "container_port": 8080,
-          "host_port": 8080,
-          "protocol": "tcp",
-          "name": "http"
-        }
-      ]
+      "container_port": 8080,
+      "host_port": 8080,
+      "protocol": "tcp"
     }
   ],
-  "resources": {
-    "cpu": 1000,      // millicores (1000 = 1 CPU)
-    "memory": 512     // megabytes
+  "restart_policy": "unless-stopped",
+  "labels": {
+    "com.example.owner": "platform"
   }
 }
+```
+
+### Full YAML example
+
+```yaml
+image: "nginx:1.25"
+env:
+  FOO: "bar"
+  DEBUG: "true"
+volumes:
+  - "/data:/app/data"
+  - "/logs:/app/logs:ro"
+network_mode: "bridge"
+ports:
+  - container_port: 8080
+    host_port: 8080
+    protocol: "tcp"
+restart_policy: "unless-stopped"
+labels:
+  com.example.owner: "platform"
+```
+
+### Using file:// with the CLI
+
+```bash
+go run ./cmd/cli create --tenant-name demo \
+  --config file:///path/to/docker-compute-config.yaml
 ```
 
 ## Container Naming
@@ -224,66 +268,36 @@ Ensure:
 2. Image is public or credentials are configured
 3. Image exists on the registry
 
-## Provider-Specific Configuration
-
-The Docker provider supports additional validation and configuration through `provider_config`:
-
-```json
-{
-  "tenant_id": "example",
-  "provider_type": "docker",
-  "containers": [...],
-  "resources": {...},
-  "provider_config": {
-    "restart_policy": "unless-stopped",
-    "log_driver": "json-file"
-  }
-}
-```
-
 ## Examples
 
-### Simple Web Service
+### Simple web service compute_config (YAML)
 
 ```yaml
-tenant_id: web-app
-provider_type: docker
-containers:
-  - name: web
-    image: nginx:alpine
-    ports:
-      - container_port: 80
-        host_port: 8080
-        protocol: tcp
-resources:
-  cpu: 500
-  memory: 256
+image: nginx:alpine
+ports:
+  - container_port: 80
+    host_port: 8080
+    protocol: tcp
 ```
 
-### Application with Configuration
+### Application with environment variables and volumes (YAML)
 
 ```yaml
-tenant_id: api-service
-provider_type: docker
-containers:
-  - name: api
-    image: mycompany/api:v2.1.0
-    command: ["/app/api"]
-    args: ["--config", "/etc/app/config.yaml"]
-    env:
-      LOG_LEVEL: info
-      ENVIRONMENT: production
-      DATABASE_HOST: postgres.internal
-      REDIS_HOST: redis.internal
-    ports:
-      - container_port: 3000
-        host_port: 3000
-        protocol: tcp
-        name: http
-      - container_port: 9090
-        host_port: 9090
-        protocol: tcp
-        name: metrics
+image: mycompany/api:v2.1.0
+env:
+  LOG_LEVEL: "info"
+  ENVIRONMENT: "production"
+  DATABASE_HOST: "postgres.internal"
+  REDIS_HOST: "redis.internal"
+volumes:
+  - "/data:/app/data"
+ports:
+  - container_port: 3000
+    host_port: 3000
+    protocol: tcp
+  - container_port: 9090
+    host_port: 9090
+    protocol: tcp
 resources:
   cpu: 2000
   memory: 1024

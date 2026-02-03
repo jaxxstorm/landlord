@@ -54,6 +54,7 @@ The docs SHALL include dedicated pages describing compute providers, workflow pr
 #### Scenario: Reader seeks provider details
 - **WHEN** a reader navigates to the component detail pages
 - **THEN** each component has its own page and external provider docs are referenced where needed
+- **AND** compute provider pages include a full compute_config option list and JSON/YAML examples
 
 ### Requirement: Swagger UI available within docs
 The docs site SHALL provide a Swagger UI page that loads the OpenAPI specification generated into `docs/swagger.json` and can be accessed from Docsify navigation.

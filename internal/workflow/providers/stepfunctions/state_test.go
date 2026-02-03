@@ -38,3 +38,18 @@ func TestMapExecutionStateDefault(t *testing.T) {
     state := mapExecutionState(types.ExecutionStatus("UNKNOWN"))
     assert.Equal(t, workflow.StatePending, state)
 }
+
+func TestMapExecutionSubStateRunning(t *testing.T) {
+    subState := mapExecutionSubState(types.ExecutionStatusRunning)
+    assert.Equal(t, workflow.SubStateRunning, subState)
+}
+
+func TestMapExecutionSubStateSucceeded(t *testing.T) {
+    subState := mapExecutionSubState(types.ExecutionStatusSucceeded)
+    assert.Equal(t, workflow.SubStateSucceeded, subState)
+}
+
+func TestMapExecutionSubStateUnknown(t *testing.T) {
+    subState := mapExecutionSubState(types.ExecutionStatus("UNKNOWN"))
+    assert.Equal(t, workflow.SubStateWaiting, subState)
+}

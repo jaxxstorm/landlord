@@ -148,6 +148,11 @@ func (m *Manager) GetWorkflowStatus(ctx context.Context, executionID string, pro
 	return provider.GetWorkflowStatus(ctx, executionID)
 }
 
+// GetProvider returns a workflow provider by type
+func (m *Manager) GetProvider(providerType string) (Provider, error) {
+	return m.registry.Get(providerType)
+}
+
 // StopExecution stops a running execution
 func (m *Manager) StopExecution(ctx context.Context, executionID string, providerType string, reason string) error {
 	m.logger.Info("stopping execution",

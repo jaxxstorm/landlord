@@ -587,6 +587,18 @@
         "workflow_execution_id": {
           "description": "WorkflowExecutionID is the ID of the current or last workflow execution",
           "type": "string"
+        },
+        "workflow_error_message": {
+          "description": "WorkflowErrorMessage is the latest workflow error message",
+          "type": "string"
+        },
+        "workflow_retry_count": {
+          "description": "WorkflowRetryCount is the number of workflow retry attempts",
+          "type": "integer"
+        },
+        "workflow_sub_state": {
+          "description": "WorkflowSubState is the provider-agnostic execution sub-state",
+          "type": "string"
         }
       }
     },
@@ -594,6 +606,24 @@
       "type": "object",
       "properties": {
         "annotations": {
+          },
+          {
+            "type": "string",
+            "description": "Filter by workflow sub-state (comma-separated)",
+            "name": "workflow_sub_state",
+            "in": "query"
+          },
+          {
+            "type": "boolean",
+            "description": "Filter tenants with workflow errors",
+            "name": "has_workflow_error",
+            "in": "query"
+          },
+          {
+            "type": "integer",
+            "description": "Minimum workflow retry count",
+            "name": "min_retry_count",
+            "in": "query"
           "description": "Annotations are key-value pairs for metadata",
           "type": "object",
           "additionalProperties": {

@@ -87,7 +87,8 @@ SELECT
     desired_config,
     observed_config, observed_resource_ids,
     created_at, updated_at,
-    version, labels, annotations, workflow_execution_id
+	version, labels, annotations, workflow_execution_id,
+	workflow_sub_state, workflow_retry_count, workflow_error_message
 FROM tenants
 WHERE name = $1
 `
@@ -112,6 +113,9 @@ func (r *Repository) GetTenantByName(ctx context.Context, name string) (*tenant.
 		&labelsJSON,
 		&annotationsJSON,
 		&t.WorkflowExecutionID,
+		&t.WorkflowSubState,
+		&t.WorkflowRetryCount,
+		&t.WorkflowErrorMessage,
 	)
 
 	if err != nil {
@@ -147,7 +151,8 @@ SELECT
     desired_config,
     observed_config, observed_resource_ids,
     created_at, updated_at,
-    version, labels, annotations, workflow_execution_id
+	version, labels, annotations, workflow_execution_id,
+	workflow_sub_state, workflow_retry_count, workflow_error_message
 FROM tenants
 WHERE id = $1
 `
@@ -172,6 +177,9 @@ func (r *Repository) GetTenantByID(ctx context.Context, id uuid.UUID) (*tenant.T
 		&labelsJSON,
 		&annotationsJSON,
 		&t.WorkflowExecutionID,
+		&t.WorkflowSubState,
+		&t.WorkflowRetryCount,
+		&t.WorkflowErrorMessage,
 	)
 
 	if err != nil {
@@ -213,8 +221,11 @@ UPDATE tenants SET
     version = version + 1,
     labels = $8,
     annotations = $9,
-    workflow_execution_id = $10
-WHERE id = $1 AND version = $11
+	workflow_execution_id = $10,
+	workflow_sub_state = $11,
+	workflow_retry_count = $12,
+	workflow_error_message = $13
+WHERE id = $1 AND version = $14
 RETURNING version, updated_at
 `
 
@@ -234,6 +245,9 @@ func (r *Repository) UpdateTenant(ctx context.Context, t *tenant.Tenant) error {
 		jsonbOrEmptyStringMap(t.Labels),
 		jsonbOrEmptyStringMap(t.Annotations),
 		t.WorkflowExecutionID,
+		t.WorkflowSubState,
+		t.WorkflowRetryCount,
+		t.WorkflowErrorMessage,
 		t.Version, // Optimistic locking check
 	)
 
@@ -284,6 +298,9 @@ func (r *Repository) ListTenants(ctx context.Context, filters tenant.ListFilters
 			&t.CreatedAt, &t.UpdatedAt,
 			&t.Version, &labelsJSON, &annotationsJSON,
 			&t.WorkflowExecutionID,
+			&t.WorkflowSubState,
+			&t.WorkflowRetryCount,
+			&t.WorkflowErrorMessage,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("scan tenant: %w", err)
@@ -322,7 +339,8 @@ SELECT
     desired_config,
     observed_config, observed_resource_ids,
     created_at, updated_at,
-    version, labels, annotations, workflow_execution_id
+	version, labels, annotations, workflow_execution_id,
+	workflow_sub_state, workflow_retry_count, workflow_error_message
 FROM tenants
 WHERE status IN ('requested', 'planning', 'provisioning', 'updating', 'deleting', 'archiving')
 ORDER BY created_at ASC
@@ -349,6 +367,9 @@ func (r *Repository) ListTenantsForReconciliation(ctx context.Context) ([]*tenan
 			&t.CreatedAt, &t.UpdatedAt,
 			&t.Version, &labelsJSON, &annotationsJSON,
 			&t.WorkflowExecutionID,
+			&t.WorkflowSubState,
+			&t.WorkflowRetryCount,
+			&t.WorkflowErrorMessage,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("scan tenant: %w", err)
@@ -389,7 +410,8 @@ func (r *Repository) buildListQuery(filters tenant.ListFilters) (string, []inter
             desired_config,
             observed_config, observed_resource_ids,
             created_at, updated_at,
-            version, labels, annotations, workflow_execution_id
+			version, labels, annotations, workflow_execution_id,
+			workflow_sub_state, workflow_retry_count, workflow_error_message
         FROM tenants
         WHERE 1=1
     `
@@ -419,6 +441,29 @@ func (r *Repository) buildListQuery(filters tenant.ListFilters) (string, []inter
 	if filters.CreatedBefore != nil {
 		query += fmt.Sprintf(" AND created_at < $%d", argPos)
 		args = append(args, *filters.CreatedBefore)
+		argPos++
+	}
+
+	// Filter by workflow sub-state
+	if len(filters.WorkflowSubStates) > 0 {
+		query += fmt.Sprintf(" AND workflow_sub_state = ANY($%d)", argPos)
+		args = append(args, filters.WorkflowSubStates)
+		argPos++
+	}
+
+	// Filter by workflow error presence
+	if filters.HasWorkflowError != nil {
+		if *filters.HasWorkflowError {
+			query += " AND workflow_error_message IS NOT NULL"
+		} else {
+			query += " AND workflow_error_message IS NULL"
+		}
+	}
+
+	// Filter by minimum retry count
+	if filters.MinRetryCount != nil {
+		query += fmt.Sprintf(" AND COALESCE(workflow_retry_count, 0) >= $%d", argPos)
+		args = append(args, *filters.MinRetryCount)
 		argPos++
 	}
 

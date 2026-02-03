@@ -283,6 +283,48 @@ func TestRepository_UpdateTenant_VersionConflict(t *testing.T) {
 	}
 }
 
+func TestRepository_PersistsWorkflowStatusFields(t *testing.T) {
+	repo, cleanup := setupTestRepo(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	tn := createTestTenant(t, "workflow-status-tenant")
+	if err := repo.CreateTenant(ctx, tn); err != nil {
+		t.Fatalf("CreateTenant() error = %v", err)
+	}
+
+	subState := "backing-off"
+	retryCount := 3
+	errMsg := "transient error"
+	execID := "exec-123"
+	tn.WorkflowSubState = &subState
+	tn.WorkflowRetryCount = &retryCount
+	tn.WorkflowErrorMessage = &errMsg
+	tn.WorkflowExecutionID = &execID
+
+	if err := repo.UpdateTenant(ctx, tn); err != nil {
+		t.Fatalf("UpdateTenant() error = %v", err)
+	}
+
+	updated, err := repo.GetTenantByID(ctx, tn.ID)
+	if err != nil {
+		t.Fatalf("GetTenantByID() error = %v", err)
+	}
+
+	if updated.WorkflowSubState == nil || *updated.WorkflowSubState != subState {
+		t.Fatalf("WorkflowSubState = %v, want %v", updated.WorkflowSubState, subState)
+	}
+	if updated.WorkflowRetryCount == nil || *updated.WorkflowRetryCount != retryCount {
+		t.Fatalf("WorkflowRetryCount = %v, want %v", updated.WorkflowRetryCount, retryCount)
+	}
+	if updated.WorkflowErrorMessage == nil || *updated.WorkflowErrorMessage != errMsg {
+		t.Fatalf("WorkflowErrorMessage = %v, want %v", updated.WorkflowErrorMessage, errMsg)
+	}
+	if updated.WorkflowExecutionID == nil || *updated.WorkflowExecutionID != execID {
+		t.Fatalf("WorkflowExecutionID = %v, want %v", updated.WorkflowExecutionID, execID)
+	}
+}
+
 func TestRepository_DeleteTenant(t *testing.T) {
 	repo, cleanup := setupTestRepo(t)
 	defer cleanup()

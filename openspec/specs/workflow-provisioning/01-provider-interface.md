@@ -171,6 +171,18 @@ result, err := provider.StartExecution(ctx, "tenant-provisioning", &workflow.Exe
 - SHOULD return quickly (< 5 seconds)
 - Terminal states (succeeded, failed, cancelled, timed_out) MUST NOT change
 
+**State Mapping (Canonical Sub-States)**:
+
+| Provider State | Canonical Sub-State |
+| --- | --- |
+| running, active, RUNNING | running |
+| pending | waiting |
+| suspended | waiting |
+| retrying, backoff | backing-off |
+| error (transient) | error |
+| completed, succeeded, SUCCEEDED | succeeded |
+| failed, FAILED, TIMED_OUT, ABORTED | failed |
+
 **Errors**:
 - ErrExecutionNotFound: If executionID doesn't exist
 - Context errors: If ctx is cancelled or times out

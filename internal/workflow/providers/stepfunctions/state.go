@@ -19,3 +19,8 @@ func mapExecutionState(status sfnTypes.ExecutionStatus) workflow.ExecutionState 
 		return workflow.StatePending
 	}
 }
+
+// mapExecutionSubState maps AWS Step Functions execution status to workflow.WorkflowSubState
+func mapExecutionSubState(status sfnTypes.ExecutionStatus) workflow.WorkflowSubState {
+	return workflow.MapExecutionStateToSubState(mapExecutionState(status))
+}

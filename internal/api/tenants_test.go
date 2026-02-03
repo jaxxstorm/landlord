@@ -60,10 +60,12 @@ func (m *mockWorkflowClient) GetExecutionStatus(ctx context.Context, executionID
 
 // mockTenantRepo implements tenant.Repository for testing
 type mockTenantRepo struct {
-	createFunc    func(ctx context.Context, t *tenant.Tenant) error
-	updateFunc    func(ctx context.Context, t *tenant.Tenant) error
-	getByIDFunc   func(ctx context.Context, id uuid.UUID) (*tenant.Tenant, error)
-	getByNameFunc func(ctx context.Context, name string) (*tenant.Tenant, error)
+	createFunc           func(ctx context.Context, t *tenant.Tenant) error
+	updateFunc           func(ctx context.Context, t *tenant.Tenant) error
+	getByIDFunc          func(ctx context.Context, id uuid.UUID) (*tenant.Tenant, error)
+	getByNameFunc        func(ctx context.Context, name string) (*tenant.Tenant, error)
+	listFunc             func(ctx context.Context, filters tenant.ListFilters) ([]*tenant.Tenant, error)
+	listForReconcileFunc func(ctx context.Context) ([]*tenant.Tenant, error)
 }
 
 func (m *mockTenantRepo) CreateTenant(ctx context.Context, t *tenant.Tenant) error {
@@ -105,6 +107,9 @@ func (m *mockTenantRepo) GetTenantByName(ctx context.Context, name string) (*ten
 }
 
 func (m *mockTenantRepo) ListTenants(ctx context.Context, filters tenant.ListFilters) ([]*tenant.Tenant, error) {
+	if m.listFunc != nil {
+		return m.listFunc(ctx, filters)
+	}
 	return nil, nil
 }
 
@@ -113,6 +118,9 @@ func (m *mockTenantRepo) DeleteTenant(ctx context.Context, id uuid.UUID) error {
 }
 
 func (m *mockTenantRepo) ListTenantsForReconciliation(ctx context.Context) ([]*tenant.Tenant, error) {
+	if m.listForReconcileFunc != nil {
+		return m.listForReconcileFunc(ctx)
+	}
 	return nil, nil
 }
 
@@ -791,6 +799,170 @@ func TestUpdateTenantInvalidStateTransition(t *testing.T) {
 	json.NewDecoder(w.Body).Decode(&errResp)
 	if errResp.Error != "Cannot update tenant in failed state" {
 		t.Errorf("expected conflict error, got %s", errResp.Error)
+	}
+}
+
+func TestListTenantsIncludesWorkflowStatusFields(t *testing.T) {
+	logger, _ := zap.NewDevelopment()
+	subState := "backing-off"
+	retryCount := 2
+	errMsg := "transient"
+	execID := "exec-123"
+
+	tenantRepo := &mockTenantRepo{
+		listFunc: func(ctx context.Context, filters tenant.ListFilters) ([]*tenant.Tenant, error) {
+			return []*tenant.Tenant{
+				{
+					ID:                  uuid.New(),
+					Name:                "workflow-tenant",
+					Status:              tenant.StatusProvisioning,
+					WorkflowExecutionID: &execID,
+					WorkflowSubState:    &subState,
+					WorkflowRetryCount:  &retryCount,
+					WorkflowErrorMessage: &errMsg,
+				},
+			}, nil
+		},
+	}
+
+	srv := &Server{
+		logger:          logger,
+		tenantRepo:      tenantRepo,
+		computeRegistry: newTestComputeRegistry(),
+		defaultComputeProvider: "mock",
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/tenants", nil)
+	w := httptest.NewRecorder()
+
+	srv.handleListTenants(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", w.Code)
+	}
+
+	var resp models.ListTenantsResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if len(resp.Tenants) != 1 {
+		t.Fatalf("expected 1 tenant, got %d", len(resp.Tenants))
+	}
+
+	got := resp.Tenants[0]
+	if got.WorkflowExecutionID == nil || *got.WorkflowExecutionID != execID {
+		t.Fatalf("workflow_execution_id = %v, want %v", got.WorkflowExecutionID, execID)
+	}
+	if got.WorkflowSubState == nil || *got.WorkflowSubState != subState {
+		t.Fatalf("workflow_sub_state = %v, want %v", got.WorkflowSubState, subState)
+	}
+	if got.WorkflowRetryCount == nil || *got.WorkflowRetryCount != retryCount {
+		t.Fatalf("workflow_retry_count = %v, want %v", got.WorkflowRetryCount, retryCount)
+	}
+	if got.WorkflowErrorMessage == nil || *got.WorkflowErrorMessage != errMsg {
+		t.Fatalf("workflow_error_message = %v, want %v", got.WorkflowErrorMessage, errMsg)
+	}
+}
+
+func TestListTenantsWorkflowFilters(t *testing.T) {
+	logger, _ := zap.NewDevelopment()
+	var captured []tenant.ListFilters
+
+	tenantRepo := &mockTenantRepo{
+		listFunc: func(ctx context.Context, filters tenant.ListFilters) ([]*tenant.Tenant, error) {
+			captured = append(captured, filters)
+			return []*tenant.Tenant{}, nil
+		},
+	}
+
+	srv := &Server{
+		logger:          logger,
+		tenantRepo:      tenantRepo,
+		computeRegistry: newTestComputeRegistry(),
+		defaultComputeProvider: "mock",
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/tenants?workflow_sub_state=backing-off,waiting&has_workflow_error=true&min_retry_count=2", nil)
+	w := httptest.NewRecorder()
+
+	srv.handleListTenants(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", w.Code)
+	}
+	if len(captured) == 0 {
+		t.Fatalf("expected filters to be captured")
+	}
+
+	filters := captured[0]
+	if len(filters.WorkflowSubStates) != 2 {
+		t.Fatalf("expected 2 workflow_sub_state values, got %d", len(filters.WorkflowSubStates))
+	}
+	if filters.HasWorkflowError == nil || *filters.HasWorkflowError != true {
+		t.Fatalf("expected has_workflow_error true")
+	}
+	if filters.MinRetryCount == nil || *filters.MinRetryCount != 2 {
+		t.Fatalf("expected min_retry_count 2")
+	}
+}
+
+func TestGetTenantIncludesWorkflowStatusFields(t *testing.T) {
+	logger, _ := zap.NewDevelopment()
+	tenantID := uuid.New()
+	subState := "running"
+	retryCount := 1
+	errMsg := "transient"
+	execID := "exec-456"
+
+	tenantRepo := &mockTenantRepo{
+		getByIDFunc: func(ctx context.Context, id uuid.UUID) (*tenant.Tenant, error) {
+			return &tenant.Tenant{
+				ID:                  tenantID,
+				Name:                "tenant-with-workflow",
+				Status:              tenant.StatusProvisioning,
+				WorkflowExecutionID: &execID,
+				WorkflowSubState:    &subState,
+				WorkflowRetryCount:  &retryCount,
+				WorkflowErrorMessage: &errMsg,
+			}, nil
+		},
+	}
+
+	srv := &Server{
+		logger:          logger,
+		tenantRepo:      tenantRepo,
+		computeRegistry: newTestComputeRegistry(),
+		defaultComputeProvider: "mock",
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/tenants/"+tenantID.String(), nil)
+	chiCtx := chi.NewRouteContext()
+	chiCtx.URLParams.Add("id", tenantID.String())
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, chiCtx))
+
+	w := httptest.NewRecorder()
+	srv.handleGetTenant(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", w.Code)
+	}
+
+	var respBody models.TenantResponse
+	if err := json.NewDecoder(w.Body).Decode(&respBody); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+
+	if respBody.WorkflowExecutionID == nil || *respBody.WorkflowExecutionID != execID {
+		t.Fatalf("workflow_execution_id = %v, want %v", respBody.WorkflowExecutionID, execID)
+	}
+	if respBody.WorkflowSubState == nil || *respBody.WorkflowSubState != subState {
+		t.Fatalf("workflow_sub_state = %v, want %v", respBody.WorkflowSubState, subState)
+	}
+	if respBody.WorkflowRetryCount == nil || *respBody.WorkflowRetryCount != retryCount {
+		t.Fatalf("workflow_retry_count = %v, want %v", respBody.WorkflowRetryCount, retryCount)
+	}
+	if respBody.WorkflowErrorMessage == nil || *respBody.WorkflowErrorMessage != errMsg {
+		t.Fatalf("workflow_error_message = %v, want %v", respBody.WorkflowErrorMessage, errMsg)
 	}
 }
 

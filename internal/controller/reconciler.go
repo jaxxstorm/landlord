@@ -253,12 +253,42 @@ func (r *Reconciler) reconcile(tenantID string) error {
 				zap.Error(err))
 			return nil
 		} else {
+			r.logger.Info("polled workflow execution status",
+				zap.String("tenant_id", tenantID),
+				zap.String("execution_id", *t.WorkflowExecutionID),
+				zap.String("state", string(execStatus.State)),
+				zap.Any("metadata", execStatus.Metadata))
+			
 			if execStatus.State == workflow.StatePending || execStatus.State == workflow.StateRunning {
-				r.logger.Info("workflow still active, skipping trigger",
+				subState, retryCount, errMsg := workflow.ExtractWorkflowDetails(execStatus)
+				
+				r.logger.Info("extracted workflow status details",
 					zap.String("tenant_id", tenantID),
-					zap.String("tenant_name", t.Name),
 					zap.String("execution_id", *t.WorkflowExecutionID),
-					zap.String("state", string(execStatus.State)))
+					zap.String("execution_state", string(execStatus.State)),
+					zap.String("sub_state", string(subState)),
+					zap.Any("retry_count", retryCount),
+					zap.Any("metadata", execStatus.Metadata))
+				
+				if retryCount == nil {
+					zero := 0
+					retryCount = &zero
+				}
+
+				changed := updateWorkflowStatusFields(t, subState, retryCount, errMsg)
+				if changed {
+					t.StatusMessage = fmt.Sprintf("Workflow execution %s: %s", subState, execStatus.ExecutionID)
+					if err := r.tenantRepo.UpdateTenant(ctx, t); err != nil {
+						return fmt.Errorf("update tenant: %w", err)
+					}
+					logWorkflowStatusChange(r.logger, t, subState, retryCount, errMsg)
+				} else {
+					r.logger.Info("workflow still active, skipping trigger",
+						zap.String("tenant_id", tenantID),
+						zap.String("tenant_name", t.Name),
+						zap.String("execution_id", *t.WorkflowExecutionID),
+						zap.String("state", string(execStatus.State)))
+				}
 				return nil
 			}
 
@@ -271,7 +301,7 @@ func (r *Reconciler) reconcile(tenantID string) error {
 					zap.String("tenant_id", tenantID),
 					zap.String("tenant_name", t.Name),
 					zap.String("status", string(t.Status)),
-					zap.String("execution_id", *t.WorkflowExecutionID),
+					zap.String("execution_id", execStatus.ExecutionID),
 					zap.Duration("duration", duration))
 				return nil
 			}
@@ -308,6 +338,12 @@ func (r *Reconciler) reconcile(tenantID string) error {
 	}
 	t.StatusMessage = fmt.Sprintf("Workflow execution started: %s", executionID)
 	t.WorkflowExecutionID = &executionID
+
+	running := string(workflow.SubStateRunning)
+	zero := 0
+	t.WorkflowSubState = &running
+	t.WorkflowRetryCount = &zero
+	t.WorkflowErrorMessage = nil
 
 	if err := r.tenantRepo.UpdateTenant(ctx, t); err != nil {
 		return fmt.Errorf("update tenant: %w", err)
@@ -381,6 +417,12 @@ func (r *Reconciler) handleWorkflowSuccess(ctx context.Context, t *tenant.Tenant
 		}
 	}
 
+	succeeded := string(workflow.SubStateSucceeded)
+	t.WorkflowSubState = &succeeded
+	t.WorkflowRetryCount = nil
+	t.WorkflowErrorMessage = nil
+	t.WorkflowExecutionID = nil
+
 	t.Status = next
 	t.StatusMessage = fmt.Sprintf("Workflow execution completed: %s", execStatus.ExecutionID)
 
@@ -399,6 +441,16 @@ func (r *Reconciler) handleWorkflowFailure(ctx context.Context, t *tenant.Tenant
 
 	t.Status = tenant.StatusFailed
 	t.StatusMessage = message
+
+	failed := string(workflow.SubStateFailed)
+	t.WorkflowSubState = &failed
+	if execStatus.Error != nil && execStatus.Error.Message != "" {
+		msg := execStatus.Error.Message
+		t.WorkflowErrorMessage = &msg
+	}
+	if _, retryCount, _ := workflow.ExtractWorkflowDetails(execStatus); retryCount != nil {
+		t.WorkflowRetryCount = retryCount
+	}
 
 	if err := r.tenantRepo.UpdateTenant(ctx, t); err != nil {
 		return fmt.Errorf("update tenant: %w", err)
@@ -471,6 +523,69 @@ func (r *Reconciler) resetRetryCount(tenantID string) {
 	r.retryMu.Lock()
 	defer r.retryMu.Unlock()
 	delete(r.retryCount, tenantID)
+}
+
+func updateWorkflowStatusFields(t *tenant.Tenant, subState workflow.WorkflowSubState, retryCount *int, errMsg *string) bool {
+	changed := false
+
+	if t.WorkflowSubState == nil || *t.WorkflowSubState != string(subState) {
+		value := string(subState)
+		t.WorkflowSubState = &value
+		changed = true
+	}
+
+	if !intPtrEqual(t.WorkflowRetryCount, retryCount) {
+		t.WorkflowRetryCount = retryCount
+		changed = true
+	}
+
+	if !stringPtrEqual(t.WorkflowErrorMessage, errMsg) {
+		t.WorkflowErrorMessage = errMsg
+		changed = true
+	}
+
+	return changed
+}
+
+func logWorkflowStatusChange(logger *zap.Logger, t *tenant.Tenant, subState workflow.WorkflowSubState, retryCount *int, errMsg *string) {
+	fields := []zap.Field{
+		zap.String("tenant_id", t.ID.String()),
+		zap.String("tenant_name", t.Name),
+		zap.String("workflow_sub_state", string(subState)),
+	}
+	if t.WorkflowExecutionID != nil {
+		fields = append(fields, zap.String("execution_id", *t.WorkflowExecutionID))
+	}
+	if retryCount != nil {
+		fields = append(fields, zap.Int("retry_count", *retryCount))
+	}
+	if errMsg != nil {
+		fields = append(fields, zap.String("workflow_error_message", *errMsg))
+		logger.Error("workflow error updated", fields...)
+		return
+	}
+
+	logger.Info("workflow status updated", fields...)
+}
+
+func stringPtrEqual(a *string, b *string) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	return *a == *b
+}
+
+func intPtrEqual(a *int, b *int) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	return *a == *b
 }
 
 // IsReady returns whether the controller is ready

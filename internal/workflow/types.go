@@ -80,6 +80,34 @@ const (
 	StateCancelled ExecutionState = "cancelled"
 )
 
+// WorkflowSubState represents provider-agnostic execution sub-state
+type WorkflowSubState string
+
+const (
+	SubStateRunning    WorkflowSubState = "running"
+	SubStateWaiting    WorkflowSubState = "waiting"
+	SubStateBackingOff WorkflowSubState = "backing-off"
+	SubStateError      WorkflowSubState = "error"
+	SubStateSucceeded  WorkflowSubState = "succeeded"
+	SubStateFailed     WorkflowSubState = "failed"
+)
+
+// MapExecutionStateToSubState maps execution state to canonical workflow sub-state
+func MapExecutionStateToSubState(state ExecutionState) WorkflowSubState {
+	switch state {
+	case StateSucceeded:
+		return SubStateSucceeded
+	case StateFailed, StateTimedOut, StateCancelled:
+		return SubStateFailed
+	case StatePending:
+		return SubStateWaiting
+	case StateRunning:
+		return SubStateRunning
+	default:
+		return SubStateRunning
+	}
+}
+
 // ExecutionError contains error details for failed executions
 type ExecutionError struct {
 	Code     string `json:"code"`

@@ -191,6 +191,9 @@ func (s *Server) handleGetTenant(w http.ResponseWriter, r *http.Request) {
 // @Param limit query int false "Maximum number of results (default 50)"
 // @Param offset query int false "Number of results to skip (default 0)"
 // @Param include_deleted query bool false "Include archived tenants in results"
+// @Param workflow_sub_state query string false "Filter by workflow sub-state (comma-separated)"
+// @Param has_workflow_error query bool false "Filter tenants with workflow errors"
+// @Param min_retry_count query int false "Minimum workflow retry count"
 // @Success 200 {object} models.ListTenantsResponse "List of tenants"
 // @Failure 400 {object} models.ErrorResponse "Invalid pagination parameters"
 // @Failure 500 {object} models.ErrorResponse "Internal server error"
@@ -203,10 +206,16 @@ func (s *Server) handleListTenants(w http.ResponseWriter, r *http.Request) {
 	limitStr := r.URL.Query().Get("limit")
 	offsetStr := r.URL.Query().Get("offset")
 	includeDeletedStr := r.URL.Query().Get("include_deleted")
+	workflowSubStateStr := r.URL.Query().Get("workflow_sub_state")
+	hasWorkflowErrorStr := r.URL.Query().Get("has_workflow_error")
+	minRetryCountStr := r.URL.Query().Get("min_retry_count")
 
 	limit := 50
 	offset := 0
 	includeDeleted := false
+	workflowSubStates := []string{}
+	var hasWorkflowError *bool
+	var minRetryCount *int
 
 	if limitStr != "" {
 		parsed, err := strconv.Atoi(limitStr)
@@ -234,11 +243,41 @@ func (s *Server) handleListTenants(w http.ResponseWriter, r *http.Request) {
 		includeDeleted = parsed
 	}
 
+	if workflowSubStateStr != "" {
+		for _, value := range strings.Split(workflowSubStateStr, ",") {
+			trimmed := strings.TrimSpace(value)
+			if trimmed != "" {
+				workflowSubStates = append(workflowSubStates, trimmed)
+			}
+		}
+	}
+
+	if hasWorkflowErrorStr != "" {
+		parsed, err := strconv.ParseBool(hasWorkflowErrorStr)
+		if err != nil {
+			s.writeErrorResponse(w, http.StatusBadRequest, "Invalid has_workflow_error parameter", []string{"has_workflow_error must be a boolean"}, requestID)
+			return
+		}
+		hasWorkflowError = &parsed
+	}
+
+	if minRetryCountStr != "" {
+		parsed, err := strconv.Atoi(minRetryCountStr)
+		if err != nil || parsed < 0 {
+			s.writeErrorResponse(w, http.StatusBadRequest, "Invalid min_retry_count parameter", []string{"min_retry_count must be a non-negative integer"}, requestID)
+			return
+		}
+		minRetryCount = &parsed
+	}
+
 	// List tenants from database
 	filters := tenant.ListFilters{
 		Limit:          limit,
 		Offset:         offset,
 		IncludeDeleted: includeDeleted,
+		WorkflowSubStates: workflowSubStates,
+		HasWorkflowError:  hasWorkflowError,
+		MinRetryCount:     minRetryCount,
 	}
 	tenants, err := s.tenantRepo.ListTenants(ctx, filters)
 	if err != nil {
@@ -404,6 +443,9 @@ func (s *Server) handleUpdateTenant(w http.ResponseWriter, r *http.Request) {
 		t.Status = tenant.StatusUpdating
 		t.StatusMessage = "Update requested"
 		t.WorkflowExecutionID = nil
+		t.WorkflowSubState = nil
+		t.WorkflowRetryCount = nil
+		t.WorkflowErrorMessage = nil
 	}
 
 	// Validate state transition
@@ -498,6 +540,9 @@ func (s *Server) handleArchiveTenant(w http.ResponseWriter, r *http.Request) {
 	t.Status = tenant.StatusArchiving
 	t.StatusMessage = "Archival requested"
 	t.WorkflowExecutionID = nil
+	t.WorkflowSubState = nil
+	t.WorkflowRetryCount = nil
+	t.WorkflowErrorMessage = nil
 	if err := tenant.ValidateTransition(previousStatus, t.Status); err != nil {
 		s.writeInvalidStateError(w, "Invalid state transition", []string{err.Error()}, requestID)
 		return
@@ -532,6 +577,9 @@ func (s *Server) handleArchiveTenant(w http.ResponseWriter, r *http.Request) {
 				t.Status = tenant.StatusArchiving
 				t.StatusMessage = "Archival requested"
 				t.WorkflowExecutionID = nil
+				t.WorkflowSubState = nil
+				t.WorkflowRetryCount = nil
+				t.WorkflowErrorMessage = nil
 				if err := tenant.ValidateTransition(previousStatus, t.Status); err != nil {
 					s.writeInvalidStateError(w, "Invalid state transition", []string{err.Error()}, requestID)
 					return
@@ -595,6 +643,9 @@ func (s *Server) handleDeleteTenant(w http.ResponseWriter, r *http.Request) {
 		t.Status = tenant.StatusDeleting
 		t.StatusMessage = "Deletion requested"
 		t.WorkflowExecutionID = nil
+		t.WorkflowSubState = nil
+		t.WorkflowRetryCount = nil
+		t.WorkflowErrorMessage = nil
 		t.UpdatedAt = time.Now()
 
 		if err := s.tenantRepo.UpdateTenant(ctx, t); err != nil {
@@ -628,6 +679,9 @@ func (s *Server) handleDeleteTenant(w http.ResponseWriter, r *http.Request) {
 	t.Status = tenant.StatusArchiving
 	t.StatusMessage = "Archival requested"
 	t.WorkflowExecutionID = nil
+	t.WorkflowSubState = nil
+	t.WorkflowRetryCount = nil
+	t.WorkflowErrorMessage = nil
 	t.UpdatedAt = time.Now()
 	if t.Annotations == nil {
 		t.Annotations = map[string]string{}

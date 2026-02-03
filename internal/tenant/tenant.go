@@ -133,6 +133,15 @@ type Tenant struct {
 	// Used to track and monitor workflow progress
 	WorkflowExecutionID *string `json:"workflow_execution_id,omitempty"`
 
+	// WorkflowSubState provides provider-agnostic execution sub-state (running, backing-off, error)
+	WorkflowSubState *string `json:"workflow_sub_state,omitempty"`
+
+	// WorkflowRetryCount tracks workflow retry attempts
+	WorkflowRetryCount *int `json:"workflow_retry_count,omitempty"`
+
+	// WorkflowErrorMessage captures latest workflow error message
+	WorkflowErrorMessage *string `json:"workflow_error_message,omitempty"`
+
 	// Desired State (Declarative)
 	// DesiredConfig is tenant-specific configuration as map
 	// Schema is flexible and provider-specific
@@ -205,6 +214,22 @@ func (t *Tenant) IsDrifted() bool {
 // Clone creates a deep copy of the tenant
 func (t *Tenant) Clone() *Tenant {
 	clone := *t
+	if t.WorkflowExecutionID != nil {
+		id := *t.WorkflowExecutionID
+		clone.WorkflowExecutionID = &id
+	}
+	if t.WorkflowSubState != nil {
+		state := *t.WorkflowSubState
+		clone.WorkflowSubState = &state
+	}
+	if t.WorkflowRetryCount != nil {
+		count := *t.WorkflowRetryCount
+		clone.WorkflowRetryCount = &count
+	}
+	if t.WorkflowErrorMessage != nil {
+		msg := *t.WorkflowErrorMessage
+		clone.WorkflowErrorMessage = &msg
+	}
 	if t.Labels != nil {
 		clone.Labels = make(map[string]string, len(t.Labels))
 		for k, v := range t.Labels {

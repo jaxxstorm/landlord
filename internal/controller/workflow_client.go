@@ -113,7 +113,17 @@ func (wc *WorkflowClient) GetExecutionStatus(ctx context.Context, executionID st
 
 	providerType := wc.providerType
 
-	status, err := wc.manager.GetWorkflowStatus(ctx, executionID, providerType)
+	// Get provider directly to access ExecutionStatus (which includes metadata)
+	provider, err := wc.manager.GetProvider(providerType)
+	if err != nil {
+		wc.logger.Error("failed to get provider",
+			zap.String("provider_type", providerType),
+			zap.Error(err))
+		return nil, err
+	}
+
+	// Call GetExecutionStatus which returns full ExecutionStatus with metadata
+	status, err := provider.GetExecutionStatus(ctx, executionID)
 	if err != nil {
 		wc.logger.Error("failed to get execution status",
 			zap.String("execution_id", executionID),
@@ -125,13 +135,7 @@ func (wc *WorkflowClient) GetExecutionStatus(ctx context.Context, executionID st
 		return nil, fmt.Errorf("workflow status is nil")
 	}
 
-	return &workflow.ExecutionStatus{
-		ExecutionID:  status.ExecutionID,
-		ProviderType: providerType,
-		State:        status.State,
-		Output:       status.Output,
-		Error:        status.Error,
-	}, nil
+	return status, nil
 }
 
 // DetermineAction determines the workflow action based on tenant status

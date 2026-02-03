@@ -67,6 +67,15 @@ type TenantResponse struct {
 	// WorkflowExecutionID is the ID of the current or last workflow execution
 	WorkflowExecutionID *string `json:"workflow_execution_id,omitempty"`
 
+	// WorkflowSubState is the provider-agnostic execution sub-state
+	WorkflowSubState *string `json:"workflow_sub_state,omitempty"`
+
+	// WorkflowRetryCount is the number of workflow retry attempts
+	WorkflowRetryCount *int `json:"workflow_retry_count,omitempty"`
+
+	// WorkflowErrorMessage is the latest workflow error message
+	WorkflowErrorMessage *string `json:"workflow_error_message,omitempty"`
+
 	// CreatedAt is when the tenant was first created
 	CreatedAt time.Time `json:"created_at"`
 
@@ -117,6 +126,9 @@ func ToTenantResponse(t *tenant.Tenant) TenantResponse {
 		ObservedConfig:      t.ObservedConfig,
 		ObservedResourceIDs: t.ObservedResourceIDs,
 		WorkflowExecutionID: t.WorkflowExecutionID,
+		WorkflowSubState:    t.WorkflowSubState,
+		WorkflowRetryCount:  t.WorkflowRetryCount,
+		WorkflowErrorMessage: t.WorkflowErrorMessage,
 		CreatedAt:           t.CreatedAt,
 		UpdatedAt:           t.UpdatedAt,
 		Version:             t.Version,

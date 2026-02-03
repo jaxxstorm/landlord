@@ -24,6 +24,11 @@ type ListFilters struct {
 	// Status filtering
 	Statuses []Status // If empty, match all statuses
 
+	// Workflow status filtering
+	WorkflowSubStates []string // Canonical workflow sub-states to match
+	MinRetryCount     *int     // Minimum retry count (inclusive)
+	HasWorkflowError  *bool    // If true, only tenants with workflow errors
+
 	// Time range filtering
 	CreatedAfter  *time.Time // If nil, no lower bound
 	CreatedBefore *time.Time // If nil, no upper bound

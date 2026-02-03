@@ -1,0 +1,19 @@
+# Example tenant compute_config for the ECS provider
+cluster_arn: "arn:aws:ecs:us-west-2:123456789012:cluster/landlord"
+task_definition_arn: "arn:aws:ecs:us-west-2:123456789012:task-definition/tenant-app:12"
+service_name_prefix: "landlord-tenant-"
+region: "us-west-2"
+desired_count: 1
+launch_type: "FARGATE"
+subnets:
+  - "subnet-123"
+  - "subnet-456"
+security_groups:
+  - "sg-123"
+assign_public_ip: true
+tags:
+  environment: "dev"
+assume_role:
+  role_arn: "arn:aws:iam::123456789012:role/landlord-ecs"
+  external_id: "tenant-provisioning"
+  session_name: "landlord-worker"

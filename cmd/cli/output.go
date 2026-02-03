@@ -19,11 +19,19 @@ var (
 )
 
 func renderTenantList(tenants []models.TenantResponse) string {
-	headers := []string{"ID", "Name", "Status"}
+	headers := []string{"ID", "Name", "Status", "Workflow", "Retries"}
 	rows := make([][]string, 0, len(tenants))
 
 	for _, t := range tenants {
-		rows = append(rows, []string{t.ID, t.Name, formatStatus(t.Status)})
+		workflow := ""
+		if t.WorkflowSubState != nil {
+			workflow = *t.WorkflowSubState
+		}
+		retries := ""
+		if t.WorkflowRetryCount != nil {
+			retries = fmt.Sprintf("%d", *t.WorkflowRetryCount)
+		}
+		rows = append(rows, []string{t.ID, t.Name, formatStatus(t.Status), workflow, retries})
 	}
 
 	widths := columnWidths(headers, rows)
@@ -49,6 +57,18 @@ func renderTenantDetails(tenant models.TenantResponse) string {
 
 	if tenant.WorkflowExecutionID != nil && *tenant.WorkflowExecutionID != "" {
 		lines = append(lines, fmt.Sprintf("%s %s", labelStyle.Render("Workflow Execution ID:"), *tenant.WorkflowExecutionID))
+	}
+
+	if tenant.WorkflowSubState != nil && *tenant.WorkflowSubState != "" {
+		lines = append(lines, fmt.Sprintf("%s %s", labelStyle.Render("Workflow Sub-State:"), *tenant.WorkflowSubState))
+	}
+
+	if tenant.WorkflowRetryCount != nil {
+		lines = append(lines, fmt.Sprintf("%s %d", labelStyle.Render("Workflow Retry Count:"), *tenant.WorkflowRetryCount))
+	}
+
+	if tenant.WorkflowErrorMessage != nil && *tenant.WorkflowErrorMessage != "" {
+		lines = append(lines, fmt.Sprintf("%s %s", labelStyle.Render("Workflow Error:"), *tenant.WorkflowErrorMessage))
 	}
 
 	if len(tenant.DesiredConfig) > 0 {

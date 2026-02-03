@@ -27,9 +27,9 @@ The system SHALL provide a CLI that loads configuration via Viper from flags, en
 The system SHALL expose verb-based commands for tenant operations, including create, list, get, set, and delete, accepting name or UUID identifiers.
 
 #### Scenario: Create command
-- **WHEN** a user runs `landlord-cli create --tenant-name <name> [--config <json>]`
+- **WHEN** a user runs `landlord-cli create --tenant-name <name> --config <json|yaml|file://path>`
 - **THEN** the CLI SHALL issue a tenant create request to the Landlord API
-- **AND** it SHALL include the compute_config payload when provided
+- **AND** it SHALL include the compute_config payload parsed from JSON or YAML input
 
 #### Scenario: List command
 - **WHEN** a user runs `landlord-cli list`
@@ -42,9 +42,9 @@ The system SHALL expose verb-based commands for tenant operations, including cre
 - **AND** it SHALL render the tenant details in a readable, styled format
 
 #### Scenario: Set command
-- **WHEN** a user runs `landlord-cli set --tenant-id <id-or-name> [--config <json>]`
+- **WHEN** a user runs `landlord-cli set --tenant-id <id-or-name> --config <json|yaml|file://path>`
 - **THEN** the CLI SHALL issue a tenant update request with the compute_config payload
-- **AND** it SHALL render a confirmation with the updated tenant details
+- **AND** it SHALL include the compute_config payload parsed from JSON or YAML input
 
 #### Scenario: Delete command
 - **WHEN** a user runs `landlord-cli delete --tenant-id <id-or-name>`

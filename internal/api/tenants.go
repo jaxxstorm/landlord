@@ -62,10 +62,26 @@ func (s *Server) handleCreateTenant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if req.ComputeConfig == nil {
+		s.writeErrorResponse(w, http.StatusBadRequest, "compute_config is required", nil, requestID)
+		return
+	}
+
 	// Validate compute configuration if provided
 	if req.ComputeConfig != nil {
-		if s.computeProvider == nil {
-			s.writeErrorResponse(w, http.StatusInternalServerError, "Compute provider not configured", nil, requestID)
+		provider, _, err := s.resolveComputeProvider(req.ComputeConfig, req.Labels, req.Annotations, nil)
+		if err != nil {
+			status := http.StatusBadRequest
+			message := "Compute provider not available"
+			if errors.Is(err, compute.ErrProviderNotFound) {
+				message = "Compute provider not available"
+			} else if strings.Contains(err.Error(), "registry not configured") {
+				status = http.StatusInternalServerError
+				message = "Compute provider registry not configured"
+			} else if strings.Contains(err.Error(), "multiple providers") {
+				message = "compute_provider is required when multiple compute providers are configured"
+			}
+			s.writeErrorResponse(w, status, message, []string{err.Error()}, requestID)
 			return
 		}
 		// Convert map to JSON for validation
@@ -74,11 +90,11 @@ func (s *Server) handleCreateTenant(w http.ResponseWriter, r *http.Request) {
 			s.writeErrorResponse(w, http.StatusBadRequest, "Invalid compute configuration format", []string{err.Error()}, requestID)
 			return
 		}
-		if err := compute.ValidateConfigAgainstSchema(s.computeProvider, configJSON); err != nil {
+		if err := compute.ValidateConfigAgainstSchema(provider, configJSON); err != nil {
 			s.writeErrorResponse(w, http.StatusBadRequest, "Invalid compute configuration", computeSchemaErrorDetails(err), requestID)
 			return
 		}
-		if err := s.computeProvider.ValidateConfig(configJSON); err != nil {
+		if err := provider.ValidateConfig(configJSON); err != nil {
 			s.writeErrorResponse(w, http.StatusBadRequest, "Invalid compute configuration", []string{err.Error()}, requestID)
 			return
 		}
@@ -298,26 +314,9 @@ func (s *Server) handleUpdateTenant(w http.ResponseWriter, r *http.Request) {
 	}
 	defer r.Body.Close()
 
-	// Validate compute configuration if provided
-	if req.ComputeConfig != nil {
-		if s.computeProvider == nil {
-			s.writeErrorResponse(w, http.StatusInternalServerError, "Compute provider not configured", nil, requestID)
-			return
-		}
-		// Convert map to JSON for validation
-		configJSON, err := json.Marshal(req.ComputeConfig)
-		if err != nil {
-			s.writeErrorResponse(w, http.StatusBadRequest, "Invalid compute configuration format", []string{err.Error()}, requestID)
-			return
-		}
-		if err := compute.ValidateConfigAgainstSchema(s.computeProvider, configJSON); err != nil {
-			s.writeErrorResponse(w, http.StatusBadRequest, "Invalid compute configuration", computeSchemaErrorDetails(err), requestID)
-			return
-		}
-		if err := s.computeProvider.ValidateConfig(configJSON); err != nil {
-			s.writeErrorResponse(w, http.StatusBadRequest, "Invalid compute configuration", []string{err.Error()}, requestID)
-			return
-		}
+	if req.ComputeConfig == nil {
+		s.writeErrorResponse(w, http.StatusBadRequest, "compute_config is required", nil, requestID)
+		return
 	}
 
 	// Get existing tenant
@@ -336,6 +335,39 @@ func (s *Server) handleUpdateTenant(w http.ResponseWriter, r *http.Request) {
 	if t.Status == tenant.StatusArchived {
 		s.writeErrorResponse(w, http.StatusConflict, "Tenant is archived", nil, requestID)
 		return
+	}
+
+	// Validate compute configuration if provided
+	if req.ComputeConfig != nil {
+		provider, _, err := s.resolveComputeProvider(req.ComputeConfig, req.Labels, req.Annotations, t)
+		if err != nil {
+			status := http.StatusBadRequest
+			message := "Compute provider not available"
+			if errors.Is(err, compute.ErrProviderNotFound) {
+				message = "Compute provider not available"
+			} else if strings.Contains(err.Error(), "registry not configured") {
+				status = http.StatusInternalServerError
+				message = "Compute provider registry not configured"
+			} else if strings.Contains(err.Error(), "multiple providers") {
+				message = "compute_provider is required when multiple compute providers are configured"
+			}
+			s.writeErrorResponse(w, status, message, []string{err.Error()}, requestID)
+			return
+		}
+
+		configJSON, err := json.Marshal(req.ComputeConfig)
+		if err != nil {
+			s.writeErrorResponse(w, http.StatusBadRequest, "Invalid compute configuration format", []string{err.Error()}, requestID)
+			return
+		}
+		if err := compute.ValidateConfigAgainstSchema(provider, configJSON); err != nil {
+			s.writeErrorResponse(w, http.StatusBadRequest, "Invalid compute configuration", computeSchemaErrorDetails(err), requestID)
+			return
+		}
+		if err := provider.ValidateConfig(configJSON); err != nil {
+			s.writeErrorResponse(w, http.StatusBadRequest, "Invalid compute configuration", []string{err.Error()}, requestID)
+			return
+		}
 	}
 
 	// Validate name update if provided

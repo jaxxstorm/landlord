@@ -29,11 +29,10 @@ log:
   format: development
 
 compute:
-  default_provider: ecs
-  defaults:
-    ecs:
-      cluster_arn: "arn:aws:ecs:us-west-2:123456789012:cluster/landlord"
-      task_definition_arn: "arn:aws:ecs:us-west-2:123456789012:task-definition/tenant-app:12"
+  ecs:
+    cluster_arn: "arn:aws:ecs:us-west-2:123456789012:cluster/landlord"
+    task_definition_arn: "arn:aws:ecs:us-west-2:123456789012:task-definition/tenant-app:12"
+    service_name_prefix: "landlord-tenant-"
 
 workflow:
   default_provider: restate

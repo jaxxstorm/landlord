@@ -857,6 +857,7 @@ var dockerConfigSchema = json.RawMessage(`{
       "additionalProperties": { "type": "string" }
     }
   },
+  "required": ["image"],
   "additionalProperties": true
 }`)
 

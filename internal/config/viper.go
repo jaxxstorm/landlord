@@ -33,7 +33,6 @@ func NewViperInstance() *viper.Viper {
 	v.SetDefault("log.level", "info")
 	v.SetDefault("log.format", "development")
 
-	v.SetDefault("compute.default_provider", "mock")
 	v.SetDefault("workflow.default_provider", "mock")
 	v.SetDefault("workflow.step_functions.region", "us-west-2")
 	v.SetDefault("workflow.restate.worker_register_on_startup", true)
@@ -108,11 +107,6 @@ func BindEnvironmentVariables(v *viper.Viper) error {
 	}
 	if err := v.BindEnv("log.format", "LOG_FORMAT"); err != nil {
 		return fmt.Errorf("failed to bind LOG_FORMAT: %w", err)
-	}
-
-	// Compute configuration
-	if err := v.BindEnv("compute.default_provider", "COMPUTE_DEFAULT_PROVIDER"); err != nil {
-		return fmt.Errorf("failed to bind COMPUTE_DEFAULT_PROVIDER: %w", err)
 	}
 
 	// Workflow configuration

@@ -1,10 +1,4 @@
-# Specification: Compute Config Discovery
-
-## Purpose
-
-Define the API and CLI contract for discovering the active compute provider schema and defaults. (TBD)
-
-## ADDED Requirements
+## MODIFIED Requirements
 
 ### Requirement: Expose compute config schema by provider
 The system SHALL expose the compute provider configuration schema via an API endpoint for a requested provider.

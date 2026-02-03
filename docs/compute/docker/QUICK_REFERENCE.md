@@ -6,8 +6,8 @@
 
 ```yaml
 compute:
-  default_provider: docker
   docker:
+    image: "nginx:latest"
     host: ""  # Uses Docker socket by default
 ```
 

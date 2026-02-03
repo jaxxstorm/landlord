@@ -12,8 +12,8 @@ type CreateTenantRequest struct {
 	Name string `json:"name" validate:"required,min=1,max=255"`
 
 	// ComputeConfig is provider-specific configuration (Docker, ECS, K8s, etc.)
-	// Validated by the active compute provider
-	ComputeConfig map[string]interface{} `json:"compute_config,omitempty"`
+	// Required and validated by the selected compute provider
+	ComputeConfig map[string]interface{} `json:"compute_config"`
 
 	// Labels are key-value pairs for organizing tenants
 	Labels map[string]string `json:"labels,omitempty"`
@@ -27,9 +27,9 @@ type UpdateTenantRequest struct {
 	// Name is the updated tenant name (optional for updates)
 	Name *string `json:"name,omitempty"`
 
-	// ComputeConfig is provider-specific configuration (optional for updates)
-	// If provided, will be validated by the active compute provider
-	ComputeConfig map[string]interface{} `json:"compute_config,omitempty"`
+	// ComputeConfig is provider-specific configuration for updates
+	// Validated by the selected compute provider
+	ComputeConfig map[string]interface{} `json:"compute_config"`
 
 	// Labels are key-value pairs for organizing tenants (optional for updates)
 	Labels map[string]string `json:"labels,omitempty"`

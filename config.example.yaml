@@ -104,20 +104,8 @@ log:
 # =============================================================================#
 
 compute:
-  # Default compute provider: mock, docker, ecs
-  # Used when creating tenants without explicit provider_type
-  default_provider: mock
-
-  # Default compute_config values used when tenants omit compute_config.
-  # REQUIRED: landlord will not start without defaults for docker and ecs.
-  defaults:
-    docker:
-      # Container image to run when compute_config does not override it.
-      image: "nginx:latest"
-    ecs:
-      # ECS cluster and task definition used when compute_config does not override them.
-      cluster_arn: "arn:aws:ecs:us-west-2:123456789012:cluster/landlord"
-      task_definition_arn: "arn:aws:ecs:us-west-2:123456789012:task-definition/tenant-app:12"
+  # Providers are enabled by presence of their config block.
+  # If multiple providers are enabled, tenants must specify compute_provider.
   
   # ============================================================================
   # Docker Provider Configuration
@@ -125,6 +113,9 @@ compute:
   # Uncomment this section to enable Docker provider
   
   # docker:
+  #   # Default compute_config values (used when tenants omit compute_config).
+  #   image: "nginx:latest"
+  #
   #   # Docker API host/endpoint
   #   # Options:
   #   #   - "" (empty): uses default Docker socket location
@@ -149,6 +140,17 @@ compute:
   #   # Container naming pattern: {label_prefix}-tenant-{tenant_id}
   #   # Example: "landlord-tenant-acme-corp"
   #   label_prefix: landlord
+
+  # ============================================================================
+  # ECS Provider Configuration
+  # ============================================================================
+  # Uncomment this section to enable ECS provider
+  #
+  # ecs:
+  #   # Default compute_config values (used when tenants omit compute_config).
+  #   cluster_arn: "arn:aws:ecs:us-west-2:123456789012:cluster/landlord"
+  #   task_definition_arn: "arn:aws:ecs:us-west-2:123456789012:task-definition/tenant-app:12"
+  #   service_name_prefix: "landlord-tenant-"
 
 ################################################################################
 # WORKFLOW PROVIDER CONFIGURATION

@@ -317,11 +317,8 @@ func TestConfigNestedStructMarshaling(t *testing.T) {
 }
 
 func setComputeDefaults(v *viper.Viper) {
-	v.Set("compute.defaults.docker", map[string]interface{}{
-		"image": "nginx:latest",
-	})
-	v.Set("compute.defaults.ecs", map[string]interface{}{
-		"cluster_arn":         "arn:aws:ecs:us-east-1:123456789012:cluster/test",
-		"task_definition_arn": "arn:aws:ecs:us-east-1:123456789012:task-definition/test:1",
-	})
+	v.Set("compute.docker.image", "nginx:latest")
+	v.Set("compute.ecs.cluster_arn", "arn:aws:ecs:us-east-1:123456789012:cluster/test")
+	v.Set("compute.ecs.task_definition_arn", "arn:aws:ecs:us-east-1:123456789012:task-definition/test:1")
+	v.Set("compute.ecs.service_name_prefix", "landlord-tenant-")
 }

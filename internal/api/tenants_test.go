@@ -13,6 +13,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jaxxstorm/landlord/internal/api/models"
+	"github.com/jaxxstorm/landlord/internal/compute"
 	computemock "github.com/jaxxstorm/landlord/internal/compute/providers/mock"
 	"github.com/jaxxstorm/landlord/internal/tenant"
 	"github.com/jaxxstorm/landlord/internal/workflow"
@@ -79,6 +80,12 @@ func (m *mockTenantRepo) UpdateTenant(ctx context.Context, t *tenant.Tenant) err
 	return nil
 }
 
+func newTestComputeRegistry() *compute.Registry {
+	registry := compute.NewRegistry(zap.NewNop())
+	_ = registry.Register(computemock.New())
+	return registry
+}
+
 func (m *mockTenantRepo) GetTenantByID(ctx context.Context, id uuid.UUID) (*tenant.Tenant, error) {
 	if m.getByIDFunc != nil {
 		return m.getByIDFunc(ctx, id)
@@ -127,7 +134,8 @@ func TestCreateTenantWithWorkflowTrigger(t *testing.T) {
 		logger:          logger,
 		workflowClient:  wfClient,
 		tenantRepo:      tenantRepo,
-		computeProvider: computemock.New(),
+		computeRegistry: newTestComputeRegistry(),
+		defaultComputeProvider: "mock",
 		router:          nil, // Not needed for direct handler testing
 	}
 
@@ -181,7 +189,8 @@ func TestCreateTenantWorkflowTriggerFailure(t *testing.T) {
 		logger:          logger,
 		workflowClient:  wfClient,
 		tenantRepo:      tenantRepo,
-		computeProvider: computemock.New(),
+		computeRegistry: newTestComputeRegistry(),
+		defaultComputeProvider: "mock",
 	}
 
 	reqBody := models.CreateTenantRequest{
@@ -207,6 +216,39 @@ func TestCreateTenantWorkflowTriggerFailure(t *testing.T) {
 	}
 }
 
+func TestCreateTenantRequiresComputeConfig(t *testing.T) {
+	logger, _ := zap.NewDevelopment()
+	tenantRepo := &mockTenantRepo{}
+
+	srv := &Server{
+		logger:          logger,
+		tenantRepo:      tenantRepo,
+		computeRegistry: newTestComputeRegistry(),
+		defaultComputeProvider: "mock",
+	}
+
+	reqBody := models.CreateTenantRequest{
+		Name: "test-tenant",
+	}
+
+	body, _ := json.Marshal(reqBody)
+	req := httptest.NewRequest(http.MethodPost, "/v1/tenants", strings.NewReader(string(body)))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	srv.handleCreateTenant(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d", w.Code)
+	}
+
+	var errResp models.ErrorResponse
+	json.NewDecoder(w.Body).Decode(&errResp)
+	if errResp.Error != "compute_config is required" {
+		t.Fatalf("expected compute_config required error, got %s", errResp.Error)
+	}
+}
+
 // TestUpdateTenantWithWorkflowTrigger tests successful tenant update with workflow triggering
 func TestUpdateTenantWithWorkflowTrigger(t *testing.T) {
 	logger, _ := zap.NewDevelopment()
@@ -228,7 +270,8 @@ func TestUpdateTenantWithWorkflowTrigger(t *testing.T) {
 		logger:          logger,
 		workflowClient:  wfClient,
 		tenantRepo:      tenantRepo,
-		computeProvider: computemock.New(),
+		computeRegistry: newTestComputeRegistry(),
+		defaultComputeProvider: "mock",
 	}
 
 	reqBody := models.UpdateTenantRequest{
@@ -273,6 +316,53 @@ func TestUpdateTenantWithWorkflowTrigger(t *testing.T) {
 	}
 }
 
+func TestUpdateTenantRequiresComputeConfig(t *testing.T) {
+	logger, _ := zap.NewDevelopment()
+	tenantID := uuid.New()
+	existingTenant := &tenant.Tenant{
+		ID:     tenantID,
+		Name:   "test-tenant",
+		Status: tenant.StatusReady,
+	}
+
+	tenantRepo := &mockTenantRepo{
+		getByIDFunc: func(ctx context.Context, id uuid.UUID) (*tenant.Tenant, error) {
+			return existingTenant, nil
+		},
+	}
+
+	srv := &Server{
+		logger:          logger,
+		tenantRepo:      tenantRepo,
+		computeRegistry: newTestComputeRegistry(),
+		defaultComputeProvider: "mock",
+	}
+
+	reqBody := models.UpdateTenantRequest{
+		Name: stringPtr("updated-name"),
+	}
+
+	body, _ := json.Marshal(reqBody)
+	req := httptest.NewRequest(http.MethodPut, "/v1/tenants/"+tenantID.String(), strings.NewReader(string(body)))
+	req.Header.Set("Content-Type", "application/json")
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, &chi.Context{
+		URLParams: chi.RouteParams{Keys: []string{"id"}, Values: []string{tenantID.String()}},
+	}))
+
+	w := httptest.NewRecorder()
+	srv.handleUpdateTenant(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d", w.Code)
+	}
+
+	var errResp models.ErrorResponse
+	json.NewDecoder(w.Body).Decode(&errResp)
+	if errResp.Error != "compute_config is required" {
+		t.Fatalf("expected compute_config required error, got %s", errResp.Error)
+	}
+}
+
 // TestUpdateArchivedTenant tests updating an archived tenant returns 409 Conflict
 func TestUpdateArchivedTenant(t *testing.T) {
 	logger, _ := zap.NewDevelopment()
@@ -294,7 +384,8 @@ func TestUpdateArchivedTenant(t *testing.T) {
 		logger:          logger,
 		workflowClient:  wfClient,
 		tenantRepo:      tenantRepo,
-		computeProvider: computemock.New(),
+		computeRegistry: newTestComputeRegistry(),
+		defaultComputeProvider: "mock",
 	}
 
 	reqBody := models.UpdateTenantRequest{
@@ -343,7 +434,8 @@ func TestDeleteTenantWithWorkflowTrigger(t *testing.T) {
 		logger:          logger,
 		workflowClient:  wfClient,
 		tenantRepo:      tenantRepo,
-		computeProvider: computemock.New(),
+		computeRegistry: newTestComputeRegistry(),
+		defaultComputeProvider: "mock",
 	}
 
 	req := httptest.NewRequest(http.MethodDelete, "/v1/tenants/"+tenantID.String(), nil)
@@ -397,7 +489,8 @@ func TestDeleteAlreadyDeletedTenant(t *testing.T) {
 		logger:          logger,
 		workflowClient:  wfClient,
 		tenantRepo:      tenantRepo,
-		computeProvider: computemock.New(),
+		computeRegistry: newTestComputeRegistry(),
+		defaultComputeProvider: "mock",
 	}
 
 	req := httptest.NewRequest(http.MethodDelete, "/v1/tenants/"+tenantID.String(), nil)
@@ -438,7 +531,8 @@ func TestWorkflowExecutionIDInResponse(t *testing.T) {
 	srv := &Server{
 		logger:          logger,
 		tenantRepo:      tenantRepo,
-		computeProvider: computemock.New(),
+		computeRegistry: newTestComputeRegistry(),
+		defaultComputeProvider: "mock",
 	}
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/tenants/"+tenantID.String(), nil)
@@ -477,7 +571,8 @@ func TestAPITriggersIncludeTriggerSource(t *testing.T) {
 		logger:          logger,
 		workflowClient:  wfClient,
 		tenantRepo:      tenantRepo,
-		computeProvider: computemock.New(),
+		computeRegistry: newTestComputeRegistry(),
+		defaultComputeProvider: "mock",
 	}
 
 	reqBody := models.CreateTenantRequest{
@@ -525,7 +620,8 @@ func TestCreateTenantWorkflowProviderUnavailable(t *testing.T) {
 		logger:          logger,
 		workflowClient:  wfClient,
 		tenantRepo:      tenantRepo,
-		computeProvider: computemock.New(),
+		computeRegistry: newTestComputeRegistry(),
+		defaultComputeProvider: "mock",
 	}
 
 	reqBody := models.CreateTenantRequest{
@@ -568,7 +664,8 @@ func TestUpdateTenantArchivedReturns409(t *testing.T) {
 	srv := &Server{
 		logger:          logger,
 		tenantRepo:      tenantRepo,
-		computeProvider: computemock.New(),
+		computeRegistry: newTestComputeRegistry(),
+		defaultComputeProvider: "mock",
 	}
 
 	reqBody := models.UpdateTenantRequest{
@@ -622,7 +719,8 @@ func TestDeleteTenantArchivedReturns200(t *testing.T) {
 	srv := &Server{
 		logger:          logger,
 		tenantRepo:      tenantRepo,
-		computeProvider: computemock.New(),
+		computeRegistry: newTestComputeRegistry(),
+		defaultComputeProvider: "mock",
 	}
 
 	req := httptest.NewRequest(http.MethodDelete, "/v1/tenants/"+tenantID.String(), nil)
@@ -661,7 +759,8 @@ func TestUpdateTenantInvalidStateTransition(t *testing.T) {
 	srv := &Server{
 		logger:          logger,
 		tenantRepo:      tenantRepo,
-		computeProvider: computemock.New(),
+		computeRegistry: newTestComputeRegistry(),
+		defaultComputeProvider: "mock",
 	}
 
 	reqBody := models.UpdateTenantRequest{

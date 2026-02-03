@@ -33,7 +33,8 @@ type Server struct {
 	router          *chi.Mux
 	server          *http.Server
 	provider        database.Provider
-	computeProvider compute.Provider
+	computeRegistry *compute.Registry
+	defaultComputeProvider string
 	tenantRepo      tenant.Repository
 	controller      ControllerHealthChecker
 	workflowClient  WorkflowClient
@@ -54,7 +55,7 @@ type WorkflowClient interface {
 }
 
 // New creates a new HTTP API server
-func New(cfg *config.HTTPConfig, dbProvider database.Provider, computeProvider compute.Provider, tenantRepo tenant.Repository, workflowClient WorkflowClient, log *zap.Logger) *Server {
+func New(cfg *config.HTTPConfig, dbProvider database.Provider, computeRegistry *compute.Registry, defaultComputeProvider string, tenantRepo tenant.Repository, workflowClient WorkflowClient, log *zap.Logger) *Server {
 	log = log.With(zap.String("component", "api"))
 
 	r := chi.NewRouter()
@@ -70,7 +71,8 @@ func New(cfg *config.HTTPConfig, dbProvider database.Provider, computeProvider c
 	srv := &Server{
 		router:          r,
 		provider:        dbProvider,
-		computeProvider: computeProvider,
+		computeRegistry: computeRegistry,
+		defaultComputeProvider: defaultComputeProvider,
 		tenantRepo:      tenantRepo,
 		controller:      nil, // Set later with SetController()
 		workflowClient:  workflowClient,

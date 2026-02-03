@@ -20,8 +20,8 @@ Add Docker provider configuration to your `config.yaml`:
 
 ```yaml
 compute:
-  default_provider: docker
   docker:
+    image: "nginx:latest"
     host: ""  # Empty defaults to Docker socket. Use "tcp://localhost:2375" for TCP connections
     network_name: bridge
     network_driver: bridge

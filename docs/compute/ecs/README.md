@@ -4,7 +4,7 @@ The ECS compute provider provisions tenant workloads as ECS services. Each tenan
 
 ## Required defaults
 
-Landlord requires a default ECS configuration at startup. Set `compute.defaults.ecs` in your config file with at least `cluster_arn` and `task_definition_arn`. Tenant `compute_config` values are merged on top of these defaults.
+Landlord requires a default ECS configuration at startup. Set `compute.ecs` in your config file with at least `cluster_arn`, `task_definition_arn`, and either `service_name` or `service_name_prefix`. Tenant `compute_config` values are merged on top of these defaults.
 
 ## Tenant compute_config example
 
@@ -38,6 +38,7 @@ To use an assumed role, include an optional `assume_role` block in `compute_conf
 {
   "cluster_arn": "arn:aws:ecs:us-west-2:123456789012:cluster/landlord",
   "task_definition_arn": "arn:aws:ecs:us-west-2:123456789012:task-definition/tenant-app:12",
+  "service_name_prefix": "landlord-tenant-",
   "assume_role": {
     "role_arn": "arn:aws:iam::123456789012:role/landlord-ecs",
     "external_id": "tenant-provisioning",

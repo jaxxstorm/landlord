@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/jaxxstorm/landlord/internal/compute"
+	"go.uber.org/zap"
 )
 
 type testComputeProvider struct {
@@ -35,15 +36,17 @@ func (t *testComputeProvider) ConfigSchema() json.RawMessage               { ret
 func (t *testComputeProvider) ConfigDefaults() json.RawMessage             { return t.defaults }
 
 func TestHandleComputeConfigDiscovery(t *testing.T) {
+	registry := compute.NewRegistry(zap.NewNop())
+	_ = registry.Register(&testComputeProvider{
+		name:     "docker",
+		schema:   json.RawMessage(`{"type":"object"}`),
+		defaults: json.RawMessage(`{"env":{"FOO":"bar"}}`),
+	})
 	srv := &Server{
-		computeProvider: &testComputeProvider{
-			name:     "docker",
-			schema:   json.RawMessage(`{"type":"object"}`),
-			defaults: json.RawMessage(`{"env":{"FOO":"bar"}}`),
-		},
+		computeRegistry: registry,
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/compute/config", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/compute/config?provider=docker", nil)
 	w := httptest.NewRecorder()
 
 	srv.handleComputeConfigDiscovery(w, req)
@@ -69,14 +72,21 @@ func TestHandleComputeConfigDiscovery(t *testing.T) {
 }
 
 func TestHandleComputeConfigDiscovery_NoProvider(t *testing.T) {
-	srv := &Server{}
+	registry := compute.NewRegistry(zap.NewNop())
+	_ = registry.Register(&testComputeProvider{
+		name:   "docker",
+		schema: json.RawMessage(`{"type":"object"}`),
+	})
+	srv := &Server{
+		computeRegistry: registry,
+	}
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/compute/config", nil)
 	w := httptest.NewRecorder()
 
 	srv.handleComputeConfigDiscovery(w, req)
 
-	if w.Code != http.StatusInternalServerError {
-		t.Fatalf("expected status 500, got %d", w.Code)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d", w.Code)
 	}
 }

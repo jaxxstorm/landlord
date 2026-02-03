@@ -48,6 +48,11 @@ func TestCLICommands(t *testing.T) {
 			w.WriteHeader(http.StatusCreated)
 			_, _ = w.Write([]byte(`{"id":"123","name":"demo","status":"planning","desired_config":{"image":"nginx:alpine"},"compute_config":{"image":"nginx:alpine"}}`))
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/compute/config":
+			if r.URL.Query().Get("provider") != "docker" {
+				w.WriteHeader(http.StatusBadRequest)
+				_, _ = w.Write([]byte(`{"error":"provider missing"}`))
+				return
+			}
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{"provider":"docker","schema":{"type":"object"},"defaults":{"env":{"FOO":"bar"}}}`))
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/tenants":
@@ -90,11 +95,11 @@ func TestCLICommands(t *testing.T) {
 	}
 
 	output, err := run("create", "--tenant-name", "demo")
-	if err != nil {
-		t.Fatalf("create command failed: %v", err)
+	if err == nil {
+		t.Fatalf("expected create command to fail without config, got output %s", output)
 	}
-	if !strings.Contains(output, "Tenant created") {
-		t.Fatalf("expected create output, got %s", output)
+	if !strings.Contains(output, "config is required") {
+		t.Fatalf("expected create error output, got %s", output)
 	}
 
 	output, err = run("create", "--tenant-name", "demo-config", "--config", `{"image":"nginx:alpine","env":{"FOO":"bar"}}`)
@@ -105,7 +110,7 @@ func TestCLICommands(t *testing.T) {
 		t.Fatalf("expected create output, got %s", output)
 	}
 
-	output, err = run("compute")
+	output, err = run("compute", "--provider", "docker")
 	if err != nil {
 		t.Fatalf("compute command failed: %v", err)
 	}

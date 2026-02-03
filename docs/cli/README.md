@@ -4,10 +4,11 @@ This CLI interacts with the Landlord API. You can point it at a specific API URL
 
 ## Create a tenant
 
-Create a tenant with an image:
+Create a tenant with compute config (required):
 
 ```bash
-go run . create --tenant-name lbr --image nginx:latest
+go run . create --tenant-name lbr \
+  --config '{"image":"nginx:latest"}'
 ```
 
 Include compute configuration (provider-specific) with `--config` as JSON. Example for Docker:
@@ -15,8 +16,7 @@ Include compute configuration (provider-specific) with `--config` as JSON. Examp
 ```bash
 go run . create \
   --tenant-name lbr \
-  --image nginx:latest \
-  --config '{"env":{"FOO":"bar"},"ports":[{"container_port":8080}]}'
+  --config '{"image":"nginx:latest","env":{"FOO":"bar"},"ports":[{"container_port":8080}]}'
 ```
 
 ## Archive a tenant
@@ -37,10 +37,11 @@ go run . delete --tenant-name lbr
 
 ## Update a tenant (set)
 
-Modify image or config:
+Modify compute config:
 
 ```bash
-go run . set --tenant-name lbr --image nginx:1.25
+go run . set --tenant-name lbr \
+  --config '{"image":"nginx:1.25"}'
 ```
 
 With compute config:
@@ -53,8 +54,8 @@ go run . set \
 
 ## Discover compute config schema
 
-Fetch the active provider schema and defaults:
+Fetch the provider schema and defaults:
 
 ```bash
-go run . compute
+go run . compute --provider docker
 ```

@@ -126,12 +126,16 @@ func TestClientComputeConfigDiscovery(t *testing.T) {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
+		if r.URL.Query().Get("provider") != "docker" {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"provider":"docker","schema":{"type":"object"},"defaults":{"env":{"FOO":"bar"}}}`))
 	}))
 
 	client := NewClient(server.URL)
-	resp, err := client.GetComputeConfigDiscovery(context.Background())
+	resp, err := client.GetComputeConfigDiscovery(context.Background(), "docker")
 	if err != nil {
 		t.Fatalf("compute config discovery failed: %v", err)
 	}

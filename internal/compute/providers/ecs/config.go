@@ -67,6 +67,10 @@ var ecsConfigSchema = json.RawMessage(`{
     }
   },
   "required": ["cluster_arn", "task_definition_arn"],
+  "anyOf": [
+    { "required": ["service_name"] },
+    { "required": ["service_name_prefix"] }
+  ],
   "additionalProperties": true
 }`)
 
@@ -100,6 +104,9 @@ func validateComputeConfig(cfg *ComputeConfig) error {
 	}
 	if cfg.TaskDefinition == "" {
 		return fmt.Errorf("task_definition_arn is required")
+	}
+	if cfg.ServiceName == "" && cfg.ServiceNamePref == "" {
+		return fmt.Errorf("service_name or service_name_prefix is required")
 	}
 	if cfg.DesiredCount != nil && *cfg.DesiredCount < 0 {
 		return fmt.Errorf("desired_count must be >= 0")

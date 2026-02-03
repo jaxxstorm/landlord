@@ -19,7 +19,8 @@ Landlord accepts desired tenant definitions, reconciles them to actual infrastru
 Example CLI flow:
 
 ```bash
-go run ./cmd/cli create --tenant-name demo-tenant --image nginx:alpine
+go run ./cmd/cli create --tenant-name demo-tenant \
+  --config '{"image":"nginx:alpine"}'
 ```
 
 ## API versioning

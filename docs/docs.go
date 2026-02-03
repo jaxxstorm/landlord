@@ -447,7 +447,7 @@ const docTemplate = `{
         "models.CreateTenantRequest": {
             "type": "object",
             "required": [
-                "image",
+                "compute_config",
                 "name"
             ],
             "properties": {
@@ -459,13 +459,9 @@ const docTemplate = `{
                     }
                 },
                 "compute_config": {
-                    "description": "ComputeConfig is provider-specific configuration (Docker, ECS, K8s, etc.)\nValidated by the active compute provider",
+                    "description": "ComputeConfig is provider-specific configuration (Docker, ECS, K8s, etc.)\nRequired and validated by the active compute provider",
                     "type": "object",
                     "additionalProperties": true
-                },
-                "image": {
-                    "description": "Image is the container image the tenant should run",
-                    "type": "string"
                 },
                 "labels": {
                     "description": "Labels are key-value pairs for organizing tenants",
@@ -601,32 +597,31 @@ const docTemplate = `{
         },
         "models.UpdateTenantRequest": {
             "type": "object",
+            "required": [
+                "compute_config"
+            ],
             "properties": {
                 "annotations": {
-                    "description": "Annotations are key-value pairs for metadata (optional for updates)",
+                    "description": "Annotations are key-value pairs for metadata",
                     "type": "object",
                     "additionalProperties": {
                         "type": "string"
                     }
                 },
                 "compute_config": {
-                    "description": "ComputeConfig is provider-specific configuration (optional for updates)\nIf provided, will be validated by the active compute provider",
+                    "description": "ComputeConfig is provider-specific configuration for updates\nRequired and validated by the active compute provider",
                     "type": "object",
                     "additionalProperties": true
                 },
-                "image": {
-                    "description": "Image is the container image the tenant should run (optional for updates)",
-                    "type": "string"
-                },
                 "labels": {
-                    "description": "Labels are key-value pairs for organizing tenants (optional for updates)",
+                    "description": "Labels are key-value pairs for organizing tenants",
                     "type": "object",
                     "additionalProperties": {
                         "type": "string"
                     }
                 },
                 "name": {
-                    "description": "Name is the updated tenant name (optional for updates)",
+                    "description": "Name is the updated tenant name",
                     "type": "string"
                 }
             }

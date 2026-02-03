@@ -52,7 +52,8 @@ func TestIntegrationAPITriggersPlanWorkflow(t *testing.T) {
 		logger:          logger,
 		workflowClient:  wfClient,
 		tenantRepo:      tenantRepo,
-		computeProvider: &testSchemaProvider{},
+		computeRegistry: newTestSchemaRegistry(),
+		defaultComputeProvider: "docker",
 	}
 
 	reqBody := models.CreateTenantRequest{
@@ -125,7 +126,8 @@ func TestIntegrationAPITriggerUpdateWorkflow(t *testing.T) {
 		logger:          logger,
 		workflowClient:  wfClient,
 		tenantRepo:      tenantRepo,
-		computeProvider: &testSchemaProvider{},
+		computeRegistry: newTestSchemaRegistry(),
+		defaultComputeProvider: "docker",
 	}
 
 	reqBody := models.UpdateTenantRequest{
@@ -195,7 +197,8 @@ func TestIntegrationAPITriggerDeleteWorkflow(t *testing.T) {
 		logger:          logger,
 		workflowClient:  wfClient,
 		tenantRepo:      tenantRepo,
-		computeProvider: &testSchemaProvider{},
+		computeRegistry: newTestSchemaRegistry(),
+		defaultComputeProvider: "docker",
 	}
 
 	req := httptest.NewRequest(http.MethodDelete, "/v1/tenants/"+tenantID.String(), nil)
@@ -263,7 +266,8 @@ func TestIntegrationConcurrentAPITriggers(t *testing.T) {
 		logger:          logger,
 		workflowClient:  wfClient,
 		tenantRepo:      tenantRepo,
-		computeProvider: &testSchemaProvider{},
+		computeRegistry: newTestSchemaRegistry(),
+		defaultComputeProvider: "docker",
 	}
 
 	reqBody := models.UpdateTenantRequest{
@@ -295,6 +299,12 @@ func TestIntegrationConcurrentAPITriggers(t *testing.T) {
 }
 
 type testSchemaProvider struct{}
+
+func newTestSchemaRegistry() *compute.Registry {
+	registry := compute.NewRegistry(zap.NewNop())
+	_ = registry.Register(&testSchemaProvider{})
+	return registry
+}
 
 func (t *testSchemaProvider) Name() string { return "docker" }
 func (t *testSchemaProvider) Provision(ctx context.Context, spec *compute.TenantComputeSpec) (*compute.ProvisionResult, error) {
@@ -349,7 +359,8 @@ func TestIntegrationCreateSetWithComputeConfig(t *testing.T) {
 		logger:          logger,
 		workflowClient:  &mockWorkflowClient{},
 		tenantRepo:      tenantRepo,
-		computeProvider: &testSchemaProvider{},
+		computeRegistry: newTestSchemaRegistry(),
+		defaultComputeProvider: "docker",
 	}
 
 	createReq := models.CreateTenantRequest{
@@ -417,7 +428,8 @@ func TestIntegrationAPITriggerFailureRecovery(t *testing.T) {
 	srv := &Server{
 		logger:          logger,
 		tenantRepo:      tenantRepo,
-		computeProvider: &testSchemaProvider{},
+		computeRegistry: newTestSchemaRegistry(),
+		defaultComputeProvider: "docker",
 	}
 
 	reqBody := models.CreateTenantRequest{

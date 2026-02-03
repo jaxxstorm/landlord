@@ -29,11 +29,8 @@ log:
   format: development
 
 compute:
-  default_provider: docker
-  defaults:
-    docker:
-      image: "nginx:latest"
   docker:
+    image: "nginx:latest"
     host: ""
     network_name: bridge
     network_driver: bridge

@@ -14,21 +14,21 @@ Compute providers provision the runtime resources for tenants (containers, netwo
 
 ```yaml
 compute:
-  default_provider: ecs
-  defaults:
-    docker:
-      image: "nginx:latest"
-    ecs:
-      cluster_arn: "arn:aws:ecs:us-west-2:123456789012:cluster/landlord"
-      task_definition_arn: "arn:aws:ecs:us-west-2:123456789012:task-definition/tenant-app:12"
   docker:
+    image: "nginx:latest"
     host: ""
     network_name: bridge
     network_driver: bridge
     label_prefix: landlord
+  ecs:
+    cluster_arn: "arn:aws:ecs:us-west-2:123456789012:cluster/landlord"
+    task_definition_arn: "arn:aws:ecs:us-west-2:123456789012:task-definition/tenant-app:12"
+    service_name_prefix: "landlord-tenant-"
 ```
 
-> `compute.defaults.docker` and `compute.defaults.ecs` are required at startup. Tenant `compute_config` values are merged on top of these defaults.
+> Providers are enabled by presence of their config block. Defaults in each provider block are merged with tenant `compute_config` values.
+
+When multiple providers are configured, set `compute_provider` (or `compute_provider_type`) in the tenant desired config, labels, or annotations so the worker can select the correct provider.
 
 ## ECS provider compute_config example
 

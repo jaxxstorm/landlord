@@ -20,18 +20,19 @@ func newCreateCommand() *cobra.Command {
 			if tenantName == "" {
 				return fmt.Errorf("tenant-name is required")
 			}
+			if config == "" {
+				return fmt.Errorf("config is required")
+			}
 
 			client := cliapi.NewClient(cfg.APIURL)
 			req := models.CreateTenantRequest{
 				Name:  tenantName,
 			}
-			if config != "" {
-				parsed, err := parseConfigInput(config)
-				if err != nil {
-					return err
-				}
-				req.ComputeConfig = parsed
+			parsed, err := parseConfigInput(config)
+			if err != nil {
+				return err
 			}
+			req.ComputeConfig = parsed
 			tenant, err := client.CreateTenant(context.Background(), req)
 			if err != nil {
 				return err

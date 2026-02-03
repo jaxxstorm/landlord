@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/signal"
@@ -63,8 +64,16 @@ func main() {
 
 	// Initialize compute registry and register providers
 	computeRegistry := compute.NewRegistry(log)
-	computeRegistry.Register(computemock.New())
-	computeRegistry.Register(computedecs.New(log, cfg.Compute.Defaults.ECS))
+	if cfg.Compute.Mock != nil {
+		computeRegistry.Register(computemock.New())
+	}
+	if cfg.Compute.ECS != nil {
+		ecsProvider := computedecs.New(log, cfg.Compute.ECS.Defaults)
+		if err := validateProviderDefaults("ecs", ecsProvider, cfg.Compute.ECS.Defaults); err != nil {
+			log.Fatal("Invalid ECS compute defaults", zap.Error(err))
+		}
+		computeRegistry.Register(ecsProvider)
+	}
 
 	// Register Docker provider if configured
 	if cfg.Compute.Docker != nil {
@@ -76,17 +85,20 @@ func main() {
 				NetworkDriver: cfg.Compute.Docker.NetworkDriver,
 				LabelPrefix:   cfg.Compute.Docker.LabelPrefix,
 			},
-			cfg.Compute.Defaults.Docker,
+			cfg.Compute.Docker.Defaults,
 			log,
 		)
 		if err != nil {
 			log.Fatal("Failed to initialize Docker provider", zap.Error(err))
 		}
+		if err := validateProviderDefaults("docker", dockerProvider, cfg.Compute.Docker.Defaults); err != nil {
+			log.Fatal("Invalid Docker compute defaults", zap.Error(err))
+		}
 		computeRegistry.Register(dockerProvider)
 	}
 
 	if cfg.Workflow.Restate.WorkerComputeProvider == "" {
-		cfg.Workflow.Restate.WorkerComputeProvider = cfg.Compute.DefaultProvider
+		cfg.Workflow.Restate.WorkerComputeProvider = cfg.Compute.DefaultProvider()
 	}
 
 	var landlordClient workflow.LandlordClient
@@ -170,4 +182,21 @@ func getWorkerAddress() string {
 		return ":" + port
 	}
 	return ":9080"
+}
+
+func validateProviderDefaults(providerName string, provider compute.Provider, defaults map[string]interface{}) error {
+	if provider == nil {
+		return nil
+	}
+	if len(defaults) == 0 {
+		return fmt.Errorf("compute.%s must include default compute_config values", providerName)
+	}
+	raw, err := json.Marshal(defaults)
+	if err != nil {
+		return fmt.Errorf("marshal %s defaults: %w", providerName, err)
+	}
+	if err := provider.ValidateConfig(raw); err != nil {
+		return fmt.Errorf("invalid %s compute defaults: %w", providerName, err)
+	}
+	return nil
 }

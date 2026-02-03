@@ -162,3 +162,32 @@ func indexOf(s, substr string) int {
 	}
 	return -1
 }
+
+func TestConfigSchemaRequiresImage(t *testing.T) {
+	logger := zaptest.NewLogger(t)
+	provider, err := New(&Config{}, map[string]interface{}{"image": "nginx:latest"}, logger)
+	if err != nil {
+		t.Skipf("skipping docker provider schema validation: %v", err)
+	}
+
+	var schema map[string]interface{}
+	if err := json.Unmarshal(provider.ConfigSchema(), &schema); err != nil {
+		t.Fatalf("expected schema to be valid JSON: %v", err)
+	}
+
+	required, ok := schema["required"].([]interface{})
+	if !ok {
+		t.Fatalf("expected required to be an array")
+	}
+
+	seen := map[string]bool{}
+	for _, item := range required {
+		if value, ok := item.(string); ok {
+			seen[value] = true
+		}
+	}
+
+	if !seen["image"] {
+		t.Fatalf("expected required fields to include image")
+	}
+}

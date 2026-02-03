@@ -219,8 +219,11 @@ func (c *Client) UpdateTenant(ctx context.Context, tenantID string, method strin
 	return &tenant, nil
 }
 
-func (c *Client) GetComputeConfigDiscovery(ctx context.Context) (*models.ComputeConfigDiscoveryResponse, error) {
+func (c *Client) GetComputeConfigDiscovery(ctx context.Context, provider string) (*models.ComputeConfigDiscoveryResponse, error) {
 	url := fmt.Sprintf("%s/compute/config", c.baseURL)
+	if provider != "" {
+		url = fmt.Sprintf("%s?provider=%s", url, provider)
+	}
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("build request: %w", err)

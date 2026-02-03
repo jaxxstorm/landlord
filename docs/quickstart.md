@@ -24,7 +24,7 @@ database:
     path: landlord.db
 
 compute:
-  default_provider: mock
+  mock: {}
 
 workflow:
   default_provider: mock
@@ -42,7 +42,8 @@ The API will be available at `http://localhost:8080`.
 ## 3. Create a tenant
 
 ```bash
-go run ./cmd/cli create --tenant-name demo-tenant --image nginx:alpine
+go run ./cmd/cli create --tenant-name demo-tenant \
+  --config '{"image":"nginx:alpine"}'
 ```
 
 ## 4. Inspect tenant state

@@ -77,7 +77,7 @@ All environment variable names remain identical:
 - `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_DATABASE`, etc.
 - `HTTP_HOST`, `HTTP_PORT`, `HTTP_SHUTDOWN_TIMEOUT`, etc.
 - `LOG_LEVEL`, `LOG_FORMAT`
-- `COMPUTE_DEFAULT_PROVIDER`, `WORKFLOW_DEFAULT_PROVIDER`, etc.
+- `WORKFLOW_DEFAULT_PROVIDER`, etc.
 
 All CLI flags remain identical:
 - `--db-host`, `--db-port`, `--db-user`, etc.
@@ -167,7 +167,10 @@ log:
   format: production
 
 compute:
-  default_provider: kubernetes
+  ecs:
+    cluster_arn: arn:aws:ecs:us-east-1:123456789012:cluster/landlord
+    task_definition_arn: arn:aws:ecs:us-east-1:123456789012:task-definition/tenant-app:12
+    service_name_prefix: landlord-tenant-
 
 workflow:
   default_provider: step-functions
@@ -329,7 +332,10 @@ data:
     log:
       level: info
     compute:
-      default_provider: kubernetes
+      ecs:
+        cluster_arn: arn:aws:ecs:us-east-1:123456789012:cluster/landlord
+        task_definition_arn: arn:aws:ecs:us-east-1:123456789012:task-definition/tenant-app:12
+        service_name_prefix: landlord-tenant-
     workflow:
       default_provider: step-functions
 ```

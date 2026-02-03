@@ -25,11 +25,8 @@ definitions:
         additionalProperties: true
         description: |-
           ComputeConfig is provider-specific configuration (Docker, ECS, K8s, etc.)
-          Validated by the active compute provider
+          Required and validated by the active compute provider
         type: object
-      image:
-        description: Image is the container image the tenant should run
-        type: string
       labels:
         additionalProperties:
           type: string
@@ -41,7 +38,7 @@ definitions:
         minLength: 1
         type: string
     required:
-    - image
+    - compute_config
     - name
     type: object
   models.ErrorResponse:
@@ -136,27 +133,24 @@ definitions:
       annotations:
         additionalProperties:
           type: string
-        description: Annotations are key-value pairs for metadata (optional for updates)
+        description: Annotations are key-value pairs for metadata
         type: object
       compute_config:
         additionalProperties: true
         description: |-
-          ComputeConfig is provider-specific configuration (optional for updates)
-          If provided, will be validated by the active compute provider
+          ComputeConfig is provider-specific configuration for updates
+          Required and validated by the active compute provider
         type: object
-      image:
-        description: Image is the container image the tenant should run (optional
-          for updates)
-        type: string
       labels:
         additionalProperties:
           type: string
-        description: Labels are key-value pairs for organizing tenants (optional for
-          updates)
+        description: Labels are key-value pairs for organizing tenants
         type: object
       name:
-        description: Name is the updated tenant name (optional for updates)
+        description: Name is the updated tenant name
         type: string
+    required:
+    - compute_config
     type: object
 info:
   contact: {}

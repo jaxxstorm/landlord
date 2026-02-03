@@ -161,7 +161,7 @@ log:
   format: development
 
 compute:
-  default_provider: mock
+  mock: {}
 
 workflow:
   default_provider: mock
@@ -202,7 +202,7 @@ log:
   format: development
 
 compute:
-  default_provider: mock
+  mock: {}
 
 workflow:
   default_provider: mock
@@ -241,7 +241,11 @@ log:
   format: production
 
 compute:
-  default_provider: kubernetes
+  ecs:
+    cluster_arn: arn:aws:ecs:us-east-1:123456789012:cluster/landlord
+    task_definition_arn: arn:aws:ecs:us-east-1:123456789012:task-definition/tenant-app:12
+    service_name_prefix: landlord-tenant-
+    service_name_prefix: landlord-tenant-
 
 workflow:
   default_provider: step-functions
@@ -292,7 +296,7 @@ controller:
     "format": "development"
   },
   "compute": {
-    "default_provider": "mock"
+    "mock": {}
   },
   "workflow": {
     "default_provider": "mock",
@@ -386,9 +390,7 @@ For more details on SQLite configuration, see [Database Provider: SQLite](./data
 
 ### Compute Configuration
 
-| Variable | Type | Default | Description |
-|----------|------|---------|-------------|
-| `COMPUTE_DEFAULT_PROVIDER` | string | `mock` | Default compute provider |
+Compute providers are configured in the config file via provider blocks (e.g., `compute.docker`). There is no global compute provider environment variable; use provider-specific variables like `DOCKER_HOST` as needed.
 
 ### Workflow Configuration
 
@@ -624,7 +626,10 @@ data:
     log:
       level: info
     compute:
-      default_provider: kubernetes
+      ecs:
+        cluster_arn: arn:aws:ecs:us-east-1:123456789012:cluster/landlord
+        task_definition_arn: arn:aws:ecs:us-east-1:123456789012:task-definition/tenant-app:12
+        service_name_prefix: landlord-tenant-
     workflow:
       default_provider: step-functions
 ```
@@ -689,7 +694,9 @@ log:
   format: production
 
 compute:
-  default_provider: kubernetes
+  ecs:
+    cluster_arn: arn:aws:ecs:us-east-1:123456789012:cluster/landlord
+    task_definition_arn: arn:aws:ecs:us-east-1:123456789012:task-definition/tenant-app:12
 
 workflow:
   default_provider: step-functions

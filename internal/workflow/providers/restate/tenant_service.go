@@ -102,12 +102,7 @@ func (s *TenantProvisioningService) provision(ctx context.Context, tenantID stri
 		return nil, err
 	}
 
-	image := desiredImageFromRequest(req)
-	if image == "" {
-		return nil, fmt.Errorf("desired image is required for provisioning")
-	}
-
-	spec := buildComputeSpec(tenantID, providerType, image, req.DesiredConfig)
+	spec := buildComputeSpec(tenantID, providerType, req.DesiredConfig)
 	result, err := computeProvider.Provision(ctx, spec)
 	if err != nil {
 		if status, statusErr := computeProvider.GetStatus(ctx, tenantID); statusErr == nil {
@@ -176,12 +171,7 @@ func (s *TenantProvisioningService) update(ctx context.Context, tenantID string,
 		return nil, err
 	}
 
-	image := desiredImageFromRequest(req)
-	if image == "" {
-		return nil, fmt.Errorf("desired image is required for update")
-	}
-
-	spec := buildComputeSpec(tenantID, providerType, image, req.DesiredConfig)
+	spec := buildComputeSpec(tenantID, providerType, req.DesiredConfig)
 	result, err := computeProvider.Update(ctx, tenantID, spec)
 	if err != nil {
 		s.logger.Error("compute update failed", zap.Error(err))
@@ -224,35 +214,18 @@ func (s *TenantProvisioningService) resolveComputeProvider(ctx context.Context, 
 	return provider, providerType, nil
 }
 
-func desiredImageFromRequest(req *ProvisioningRequest) string {
-	if req.DesiredImage != "" {
-		return req.DesiredImage
-	}
-	if req.DesiredConfig != nil {
-		if image, ok := req.DesiredConfig["image"]; ok {
-			if value, ok := image.(string); ok {
-				return value
-			}
-		}
-		if image, ok := req.DesiredConfig["desired_image"]; ok {
-			if value, ok := image.(string); ok {
-				return value
-			}
-		}
-	}
-	return ""
-}
-
-func buildComputeSpec(tenantID, providerType, image string, desiredConfig map[string]interface{}) *compute.TenantComputeSpec {
+func buildComputeSpec(tenantID, providerType string, desiredConfig map[string]interface{}) *compute.TenantComputeSpec {
 	spec := &compute.TenantComputeSpec{
 		TenantID:     tenantID,
 		ProviderType: providerType,
-		Containers: []compute.ContainerSpec{
+	}
+
+	if providerType == "docker" {
+		spec.Containers = []compute.ContainerSpec{
 			{
-				Name:  "app",
-				Image: image,
+				Name: "app",
 			},
-		},
+		}
 	}
 
 	if len(desiredConfig) > 0 {

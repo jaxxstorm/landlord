@@ -1,6 +1,6 @@
-# Docker Compose Test Configuration
-# Minimal configuration for local development and testing via docker-compose
-# This file is mounted inside the Landlord container in docker-compose.yml
+# ECS Compose Test Configuration
+# Minimal configuration for local development and testing via docker-compose.ecs.yaml
+# This file is mounted inside the Landlord container when running ECS tests
 
 database:
   provider: postgres
@@ -29,12 +29,11 @@ log:
   format: development
 
 compute:
-  default_provider: docker
-  docker:
-    host: ""
-    network_name: bridge
-    network_driver: bridge
-    label_prefix: landlord
+  default_provider: ecs
+  defaults:
+    ecs:
+      cluster_arn: "arn:aws:ecs:us-west-2:123456789012:cluster/landlord"
+      task_definition_arn: "arn:aws:ecs:us-west-2:123456789012:task-definition/tenant-app:12"
 
 workflow:
   default_provider: restate
@@ -56,4 +55,4 @@ controller:
   workflow_trigger_timeout: 30s
   shutdown_timeout: 30s
   max_retries: 5
-  workflow_provider: ""
+  workflow_provider: restate

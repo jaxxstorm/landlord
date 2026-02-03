@@ -2,6 +2,7 @@ package tenant
 
 import (
 	"fmt"
+	"reflect"
 	"regexp"
 	"time"
 
@@ -133,19 +134,12 @@ type Tenant struct {
 	WorkflowExecutionID *string `json:"workflow_execution_id,omitempty"`
 
 	// Desired State (Declarative)
-	// DesiredImage is the container image the tenant should run
-	// Example: "docker.io/myapp:v1.2.3"
-	DesiredImage string `json:"desired_image"`
-
 	// DesiredConfig is tenant-specific configuration as map
 	// Schema is flexible and provider-specific
 	// Example: {"replicas": "2", "cpu": "512", "memory": "1024"}
 	DesiredConfig map[string]interface{} `json:"desired_config,omitempty"`
 
 	// Observed State (Actual)
-	// ObservedImage is the container image currently running (may differ from desired during updates)
-	ObservedImage string `json:"observed_image,omitempty"`
-
 	// ObservedConfig is the actual configuration applied to running resources
 	ObservedConfig map[string]interface{} `json:"observed_config,omitempty"`
 
@@ -186,9 +180,6 @@ func (t *Tenant) Validate() error {
 	if !tenantNamePattern.MatchString(t.Name) {
 		return fmt.Errorf("name must be lowercase alphanumeric with hyphens")
 	}
-	if t.DesiredImage == "" {
-		return fmt.Errorf("desired_image is required")
-	}
 	if t.Status == "" {
 		return fmt.Errorf("status is required")
 	}
@@ -208,7 +199,7 @@ func (t *Tenant) IsDrifted() bool {
 	if t.Status != StatusReady {
 		return false // Only check drift for ready tenants
 	}
-	return t.DesiredImage != t.ObservedImage
+	return !reflect.DeepEqual(t.DesiredConfig, t.ObservedConfig)
 }
 
 // Clone creates a deep copy of the tenant

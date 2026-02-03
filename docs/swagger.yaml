@@ -93,9 +93,6 @@ definitions:
         additionalProperties: true
         description: DesiredConfig is tenant-specific configuration
         type: object
-      desired_image:
-        description: DesiredImage is the container image the tenant should run
-        type: string
       id:
         description: ID is the internal database identifier (UUID)
         type: string
@@ -112,9 +109,6 @@ definitions:
         description: ObservedConfig is the actual configuration applied to running
           resources
         type: object
-      observed_image:
-        description: ObservedImage is the container image currently running
-        type: string
       observed_resource_ids:
         additionalProperties:
           type: string

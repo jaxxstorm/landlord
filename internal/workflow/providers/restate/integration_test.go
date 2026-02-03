@@ -53,7 +53,7 @@ func TestRestateIntegrationTenantProvisioningWithDocker(t *testing.T) {
 		t.Fatal("expected execution result")
 	}
 
-	dockerProvider, err := docker.New(&docker.Config{}, logger)
+	dockerProvider, err := docker.New(&docker.Config{}, map[string]interface{}{"image": "alpine:latest"}, logger)
 	if err != nil {
 		t.Skipf("skipping docker integration: %v", err)
 	}
@@ -72,16 +72,16 @@ func TestRestateIntegrationTenantProvisioningWithDocker(t *testing.T) {
 	service := restate.NewTenantProvisioningService(registry, "docker", nil, logger)
 
 	_, err = service.Execute(ctx, &restate.ProvisioningRequest{
-		TenantID:     tenantID,
-		Operation:    "plan",
-		DesiredImage: imageRef,
+		TenantID:      tenantID,
+		Operation:     "plan",
+		DesiredConfig: map[string]interface{}{"image": imageRef},
 	})
 	requireNoError(t, err, "plan execution")
 
 	_, err = service.Execute(ctx, &restate.ProvisioningRequest{
-		TenantID:     tenantID,
-		Operation:    "apply",
-		DesiredImage: imageRef,
+		TenantID:      tenantID,
+		Operation:     "apply",
+		DesiredConfig: map[string]interface{}{"image": imageRef},
 	})
 	requireNoError(t, err, "apply execution")
 
@@ -132,23 +132,23 @@ func TestRestateWorkerLifecycleWithRegistration(t *testing.T) {
 	service := restate.NewTenantProvisioningService(registry, "mock", resolver, logger)
 
 	_, err = service.Execute(ctx, &restate.ProvisioningRequest{
-		TenantID:     "worker-test",
-		Operation:    "plan",
-		DesiredImage: "example:v1",
+		TenantID:      "worker-test",
+		Operation:     "plan",
+		DesiredConfig: map[string]interface{}{"image": "example:v1"},
 	})
 	requireNoError(t, err, "plan execution")
 
 	_, err = service.Execute(ctx, &restate.ProvisioningRequest{
-		TenantID:     "worker-test",
-		Operation:    "apply",
-		DesiredImage: "example:v1",
+		TenantID:      "worker-test",
+		Operation:     "apply",
+		DesiredConfig: map[string]interface{}{"image": "example:v1"},
 	})
 	requireNoError(t, err, "apply execution")
 
 	_, err = service.Execute(ctx, &restate.ProvisioningRequest{
-		TenantID:     "worker-test",
-		Operation:    "update",
-		DesiredImage: "example:v1",
+		TenantID:      "worker-test",
+		Operation:     "update",
+		DesiredConfig: map[string]interface{}{"image": "example:v1"},
 	})
 	requireNoError(t, err, "update execution")
 
@@ -172,24 +172,24 @@ func TestRestateCreateIdempotency(t *testing.T) {
 	service := restate.NewTenantProvisioningService(registry, "mock", nil, logger)
 
 	_, err := service.Execute(ctx, &restate.ProvisioningRequest{
-		TenantID:     "idempotent-create",
-		Operation:    "plan",
-		DesiredImage: "example:v1",
+		TenantID:      "idempotent-create",
+		Operation:     "plan",
+		DesiredConfig: map[string]interface{}{"image": "example:v1"},
 	})
 	requireNoError(t, err, "plan execution")
 
 	_, err = service.Execute(ctx, &restate.ProvisioningRequest{
-		TenantID:     "idempotent-create",
-		Operation:    "apply",
-		DesiredImage: "example:v1",
+		TenantID:      "idempotent-create",
+		Operation:     "apply",
+		DesiredConfig: map[string]interface{}{"image": "example:v1"},
 	})
 	requireNoError(t, err, "apply execution")
 
 	// Apply again should be idempotent.
 	_, err = service.Execute(ctx, &restate.ProvisioningRequest{
-		TenantID:     "idempotent-create",
-		Operation:    "apply",
-		DesiredImage: "example:v1",
+		TenantID:      "idempotent-create",
+		Operation:     "apply",
+		DesiredConfig: map[string]interface{}{"image": "example:v1"},
 	})
 	requireNoError(t, err, "apply idempotency execution")
 }
@@ -207,23 +207,23 @@ func TestRestateUpdateNoChanges(t *testing.T) {
 	service := restate.NewTenantProvisioningService(registry, "mock", nil, logger)
 
 	_, err := service.Execute(ctx, &restate.ProvisioningRequest{
-		TenantID:     "update-noop",
-		Operation:    "plan",
-		DesiredImage: "example:v1",
+		TenantID:      "update-noop",
+		Operation:     "plan",
+		DesiredConfig: map[string]interface{}{"image": "example:v1"},
 	})
 	requireNoError(t, err, "plan execution")
 
 	_, err = service.Execute(ctx, &restate.ProvisioningRequest{
-		TenantID:     "update-noop",
-		Operation:    "apply",
-		DesiredImage: "example:v1",
+		TenantID:      "update-noop",
+		Operation:     "apply",
+		DesiredConfig: map[string]interface{}{"image": "example:v1"},
 	})
 	requireNoError(t, err, "apply execution")
 
 	_, err = service.Execute(ctx, &restate.ProvisioningRequest{
-		TenantID:     "update-noop",
-		Operation:    "update",
-		DesiredImage: "example:v1",
+		TenantID:      "update-noop",
+		Operation:     "update",
+		DesiredConfig: map[string]interface{}{"image": "example:v1"},
 	})
 	requireNoError(t, err, "update execution")
 }

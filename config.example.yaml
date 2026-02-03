@@ -104,9 +104,20 @@ log:
 # =============================================================================#
 
 compute:
-  # Default compute provider: mock, docker
+  # Default compute provider: mock, docker, ecs
   # Used when creating tenants without explicit provider_type
   default_provider: mock
+
+  # Default compute_config values used when tenants omit compute_config.
+  # REQUIRED: landlord will not start without defaults for docker and ecs.
+  defaults:
+    docker:
+      # Container image to run when compute_config does not override it.
+      image: "nginx:latest"
+    ecs:
+      # ECS cluster and task definition used when compute_config does not override them.
+      cluster_arn: "arn:aws:ecs:us-west-2:123456789012:cluster/landlord"
+      task_definition_arn: "arn:aws:ecs:us-west-2:123456789012:task-definition/tenant-app:12"
   
   # ============================================================================
   # Docker Provider Configuration

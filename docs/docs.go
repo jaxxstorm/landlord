@@ -550,10 +550,6 @@ const docTemplate = `{
                     "type": "object",
                     "additionalProperties": true
                 },
-                "desired_image": {
-                    "description": "DesiredImage is the container image the tenant should run",
-                    "type": "string"
-                },
                 "id": {
                     "description": "ID is the internal database identifier (UUID)",
                     "type": "string"
@@ -573,10 +569,6 @@ const docTemplate = `{
                     "description": "ObservedConfig is the actual configuration applied to running resources",
                     "type": "object",
                     "additionalProperties": true
-                },
-                "observed_image": {
-                    "description": "ObservedImage is the container image currently running",
-                    "type": "string"
                 },
                 "observed_resource_ids": {
                     "description": "ObservedResourceIDs contains provider-specific resource identifiers",

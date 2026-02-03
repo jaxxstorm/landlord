@@ -73,7 +73,6 @@ func (wc *WorkflowClient) TriggerWorkflowWithSource(ctx context.Context, t *tena
 		TenantID:      t.Name,
 		TenantUUID:    t.ID.String(),
 		Operation:     action,
-		DesiredImage:  t.DesiredImage,
 		DesiredConfig: t.DesiredConfig,
 	}
 	if provider, ok := t.DesiredConfig["compute_provider"]; ok {

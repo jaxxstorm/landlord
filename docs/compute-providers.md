@@ -6,6 +6,7 @@ Compute providers provision the runtime resources for tenants (containers, netwo
 
 | Provider | Use case | Notes |
 | --- | --- | --- |
+| ecs | AWS ECS | Provisions a single ECS service per tenant |
 | docker | Local development and simple deployments | Uses Docker Engine for container provisioning |
 | mock | Tests and demos | In-memory, no real infrastructure |
 
@@ -13,12 +14,35 @@ Compute providers provision the runtime resources for tenants (containers, netwo
 
 ```yaml
 compute:
-  default_provider: docker
+  default_provider: ecs
+  defaults:
+    docker:
+      image: "nginx:latest"
+    ecs:
+      cluster_arn: "arn:aws:ecs:us-west-2:123456789012:cluster/landlord"
+      task_definition_arn: "arn:aws:ecs:us-west-2:123456789012:task-definition/tenant-app:12"
   docker:
     host: ""
     network_name: bridge
     network_driver: bridge
     label_prefix: landlord
+```
+
+> `compute.defaults.docker` and `compute.defaults.ecs` are required at startup. Tenant `compute_config` values are merged on top of these defaults.
+
+## ECS provider compute_config example
+
+```json
+{
+  "cluster_arn": "arn:aws:ecs:us-west-2:123456789012:cluster/landlord",
+  "task_definition_arn": "arn:aws:ecs:us-west-2:123456789012:task-definition/tenant-app:12",
+  "desired_count": 1,
+  "launch_type": "FARGATE",
+  "subnets": ["subnet-123", "subnet-456"],
+  "security_groups": ["sg-123"],
+  "assign_public_ip": true,
+  "service_name_prefix": "landlord-tenant-"
+}
 ```
 
 ## Provider interface

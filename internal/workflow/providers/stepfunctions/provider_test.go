@@ -20,8 +20,7 @@ func TestInvokeAcceptsProvisioningPayload(t *testing.T) {
 	request := &workflow.ProvisionRequest{
 		TenantID:      "tenant-1",
 		Operation:     "plan",
-		DesiredImage:  "nginx:latest",
-		DesiredConfig: map[string]interface{}{"replicas": "2"},
+		DesiredConfig: map[string]interface{}{"image": "nginx:latest", "replicas": "2"},
 	}
 
 	result, err := provider.Invoke(context.Background(), "tenant-provisioning", request)

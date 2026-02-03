@@ -50,7 +50,6 @@ type ProvisionRequest struct {
 	TenantID        string                 `json:"tenant_id"`
 	TenantUUID      string                 `json:"tenant_uuid,omitempty"`
 	Operation       string                 `json:"operation,omitempty"`
-	DesiredImage    string                 `json:"desired_image,omitempty"`
 	DesiredConfig   map[string]interface{} `json:"desired_config,omitempty"`
 	ComputeProvider string                 `json:"compute_provider,omitempty"`
 	APIBaseURL      string                 `json:"api_base_url,omitempty"`

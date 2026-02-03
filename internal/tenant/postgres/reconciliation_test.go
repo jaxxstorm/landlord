@@ -242,8 +242,8 @@ func TestRepository_ListTenantsForReconciliation_PreservesTenantData(t *testing.
 	original := createTestTenant(t, "data-preservation")
 	original.Status = tenant.StatusProvisioning
 	original.StatusMessage = "In provisioning"
-	original.DesiredImage = "myapp:v2"
 	original.DesiredConfig = map[string]interface{}{
+		"image":    "myapp:v2",
 		"replicas": "5",
 		"zone":     "us-east-1",
 	}
@@ -280,9 +280,6 @@ func TestRepository_ListTenantsForReconciliation_PreservesTenantData(t *testing.
 	}
 	if retrieved.StatusMessage != original.StatusMessage {
 		t.Errorf("StatusMessage = %s, want %s", retrieved.StatusMessage, original.StatusMessage)
-	}
-	if retrieved.DesiredImage != original.DesiredImage {
-		t.Errorf("DesiredImage = %s, want %s", retrieved.DesiredImage, original.DesiredImage)
 	}
 
 	// Check config maps

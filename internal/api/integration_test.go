@@ -49,14 +49,17 @@ func TestIntegrationAPITriggersPlanWorkflow(t *testing.T) {
 	}
 
 	srv := &Server{
-		logger:         logger,
-		workflowClient: wfClient,
-		tenantRepo:     tenantRepo,
+		logger:          logger,
+		workflowClient:  wfClient,
+		tenantRepo:      tenantRepo,
+		computeProvider: &testSchemaProvider{},
 	}
 
 	reqBody := models.CreateTenantRequest{
-		Name:  "integration-test-1",
-		Image: "nginx:latest",
+		Name: "integration-test-1",
+		ComputeConfig: map[string]interface{}{
+			"image": "nginx:latest",
+		},
 	}
 
 	body, _ := json.Marshal(reqBody)
@@ -119,13 +122,16 @@ func TestIntegrationAPITriggerUpdateWorkflow(t *testing.T) {
 	}
 
 	srv := &Server{
-		logger:         logger,
-		workflowClient: wfClient,
-		tenantRepo:     tenantRepo,
+		logger:          logger,
+		workflowClient:  wfClient,
+		tenantRepo:      tenantRepo,
+		computeProvider: &testSchemaProvider{},
 	}
 
 	reqBody := models.UpdateTenantRequest{
-		Image: stringPtr("nginx:2.0"),
+		ComputeConfig: map[string]interface{}{
+			"image": "nginx:2.0",
+		},
 	}
 
 	body, _ := json.Marshal(reqBody)
@@ -186,9 +192,10 @@ func TestIntegrationAPITriggerDeleteWorkflow(t *testing.T) {
 	}
 
 	srv := &Server{
-		logger:         logger,
-		workflowClient: wfClient,
-		tenantRepo:     tenantRepo,
+		logger:          logger,
+		workflowClient:  wfClient,
+		tenantRepo:      tenantRepo,
+		computeProvider: &testSchemaProvider{},
 	}
 
 	req := httptest.NewRequest(http.MethodDelete, "/v1/tenants/"+tenantID.String(), nil)
@@ -253,13 +260,16 @@ func TestIntegrationConcurrentAPITriggers(t *testing.T) {
 	}
 
 	srv := &Server{
-		logger:         logger,
-		workflowClient: wfClient,
-		tenantRepo:     tenantRepo,
+		logger:          logger,
+		workflowClient:  wfClient,
+		tenantRepo:      tenantRepo,
+		computeProvider: &testSchemaProvider{},
 	}
 
 	reqBody := models.UpdateTenantRequest{
-		Image: stringPtr("nginx:2.0"),
+		ComputeConfig: map[string]interface{}{
+			"image": "nginx:2.0",
+		},
 	}
 
 	body, _ := json.Marshal(reqBody)
@@ -321,10 +331,12 @@ func TestIntegrationCreateSetWithComputeConfig(t *testing.T) {
 		},
 		getByIDFunc: func(ctx context.Context, id uuid.UUID) (*tenant.Tenant, error) {
 			return &tenant.Tenant{
-				ID:           id,
-				Name:         "config-tenant",
-				Status:       tenant.StatusReady,
-				DesiredImage: "nginx:latest",
+				ID:     id,
+				Name:   "config-tenant",
+				Status: tenant.StatusReady,
+				DesiredConfig: map[string]interface{}{
+					"image": "nginx:latest",
+				},
 			}, nil
 		},
 		updateFunc: func(ctx context.Context, t *tenant.Tenant) error {
@@ -341,9 +353,9 @@ func TestIntegrationCreateSetWithComputeConfig(t *testing.T) {
 	}
 
 	createReq := models.CreateTenantRequest{
-		Name:  "config-tenant",
-		Image: "nginx:latest",
+		Name: "config-tenant",
 		ComputeConfig: map[string]interface{}{
+			"image": "nginx:latest",
 			"env": map[string]interface{}{
 				"FOO": "bar",
 			},
@@ -403,13 +415,16 @@ func TestIntegrationAPITriggerFailureRecovery(t *testing.T) {
 	}
 
 	srv := &Server{
-		logger:     logger,
-		tenantRepo: tenantRepo,
+		logger:          logger,
+		tenantRepo:      tenantRepo,
+		computeProvider: &testSchemaProvider{},
 	}
 
 	reqBody := models.CreateTenantRequest{
-		Name:  "failure-test",
-		Image: "nginx:latest",
+		Name: "failure-test",
+		ComputeConfig: map[string]interface{}{
+			"image": "nginx:latest",
+		},
 	}
 
 	body, _ := json.Marshal(reqBody)

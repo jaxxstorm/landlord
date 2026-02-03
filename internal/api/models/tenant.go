@@ -11,9 +11,6 @@ type CreateTenantRequest struct {
 	// Name is the unique human-friendly name for the tenant
 	Name string `json:"name" validate:"required,min=1,max=255"`
 
-	// Image is the container image the tenant should run
-	Image string `json:"image" validate:"required"`
-
 	// ComputeConfig is provider-specific configuration (Docker, ECS, K8s, etc.)
 	// Validated by the active compute provider
 	ComputeConfig map[string]interface{} `json:"compute_config,omitempty"`
@@ -29,9 +26,6 @@ type CreateTenantRequest struct {
 type UpdateTenantRequest struct {
 	// Name is the updated tenant name (optional for updates)
 	Name *string `json:"name,omitempty"`
-
-	// Image is the container image the tenant should run (optional for updates)
-	Image *string `json:"image,omitempty"`
 
 	// ComputeConfig is provider-specific configuration (optional for updates)
 	// If provided, will be validated by the active compute provider
@@ -58,17 +52,11 @@ type TenantResponse struct {
 	// StatusMessage provides human-readable context about current status
 	StatusMessage string `json:"status_message,omitempty"`
 
-	// DesiredImage is the container image the tenant should run
-	DesiredImage string `json:"desired_image"`
-
 	// DesiredConfig is tenant-specific configuration
 	DesiredConfig map[string]interface{} `json:"desired_config,omitempty"`
 
 	// ComputeConfig is the provider-specific compute configuration
 	ComputeConfig map[string]interface{} `json:"compute_config,omitempty"`
-
-	// ObservedImage is the container image currently running
-	ObservedImage string `json:"observed_image,omitempty"`
 
 	// ObservedConfig is the actual configuration applied to running resources
 	ObservedConfig map[string]interface{} `json:"observed_config,omitempty"`
@@ -125,9 +113,7 @@ func ToTenantResponse(t *tenant.Tenant) TenantResponse {
 		Name:                t.Name,
 		Status:              string(t.Status),
 		StatusMessage:       t.StatusMessage,
-		DesiredImage:        t.DesiredImage,
 		DesiredConfig:       t.DesiredConfig,
-		ObservedImage:       t.ObservedImage,
 		ObservedConfig:      t.ObservedConfig,
 		ObservedResourceIDs: t.ObservedResourceIDs,
 		WorkflowExecutionID: t.WorkflowExecutionID,
@@ -150,7 +136,6 @@ func ToTenantResponse(t *tenant.Tenant) TenantResponse {
 func FromCreateRequest(req *CreateTenantRequest) (*tenant.Tenant, error) {
 	t := &tenant.Tenant{
 		Name:         req.Name,
-		DesiredImage: req.Image,
 		Labels:       req.Labels,
 		Annotations:  req.Annotations,
 		Status:       tenant.StatusRequested,
@@ -168,9 +153,6 @@ func FromCreateRequest(req *CreateTenantRequest) (*tenant.Tenant, error) {
 func ApplyUpdateRequest(t *tenant.Tenant, req *UpdateTenantRequest) error {
 	if req.Name != nil {
 		t.Name = *req.Name
-	}
-	if req.Image != nil {
-		t.DesiredImage = *req.Image
 	}
 
 	if req.ComputeConfig != nil {

@@ -46,32 +46,32 @@ func TestCLICommands(t *testing.T) {
 			}
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusCreated)
-			_, _ = w.Write([]byte(`{"id":"123","name":"demo","status":"planning","desired_image":"nginx:alpine"}`))
+			_, _ = w.Write([]byte(`{"id":"123","name":"demo","status":"planning","desired_config":{"image":"nginx:alpine"},"compute_config":{"image":"nginx:alpine"}}`))
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/compute/config":
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{"provider":"docker","schema":{"type":"object"},"defaults":{"env":{"FOO":"bar"}}}`))
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/tenants":
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"tenants":[{"id":"123","name":"demo","status":"ready","desired_image":"nginx:alpine"}],"total":1,"limit":50,"offset":0}`))
+			_, _ = w.Write([]byte(`{"tenants":[{"id":"123","name":"demo","status":"ready","desired_config":{"image":"nginx:alpine"},"compute_config":{"image":"nginx:alpine"}}],"total":1,"limit":50,"offset":0}`))
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/tenants/123":
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"id":"123","name":"demo","status":"archived","desired_image":"nginx:alpine"}`))
+			_, _ = w.Write([]byte(`{"id":"123","name":"demo","status":"archived","desired_config":{"image":"nginx:alpine"},"compute_config":{"image":"nginx:alpine"}}`))
 		case r.Method == http.MethodPost && r.URL.Path == "/v1/tenants/123/archive":
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"id":"123","name":"demo","status":"archiving","desired_image":"nginx:alpine"}`))
+			_, _ = w.Write([]byte(`{"id":"123","name":"demo","status":"archiving","desired_config":{"image":"nginx:alpine"},"compute_config":{"image":"nginx:alpine"}}`))
 		case (r.Method == http.MethodPut || r.Method == http.MethodPatch) && r.URL.Path == "/v1/tenants/123":
 			var payload map[string]any
 			_ = json.NewDecoder(r.Body).Decode(&payload)
-			if payload["image"] != "nginx:1.25" && payload["compute_config"] == nil {
+			if payload["compute_config"] == nil {
 				w.WriteHeader(http.StatusBadRequest)
-				_, _ = w.Write([]byte(`{"error":"image missing"}`))
+				_, _ = w.Write([]byte(`{"error":"compute_config missing"}`))
 				return
 			}
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"id":"123","name":"demo","status":"planning","desired_image":"nginx:1.25"}`))
+			_, _ = w.Write([]byte(`{"id":"123","name":"demo","status":"planning","desired_config":{"image":"nginx:1.25"},"compute_config":{"image":"nginx:1.25"}}`))
 		case r.Method == http.MethodDelete && r.URL.Path == "/v1/tenants/123":
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"id":"123","name":"demo","status":"deleting","desired_image":"nginx:alpine"}`))
+			_, _ = w.Write([]byte(`{"id":"123","name":"demo","status":"deleting","desired_config":{"image":"nginx:alpine"},"compute_config":{"image":"nginx:alpine"}}`))
 		default:
 			w.WriteHeader(http.StatusMethodNotAllowed)
 		}
@@ -89,7 +89,7 @@ func TestCLICommands(t *testing.T) {
 		return out.String(), err
 	}
 
-	output, err := run("create", "--tenant-name", "demo", "--image", "nginx:alpine")
+	output, err := run("create", "--tenant-name", "demo")
 	if err != nil {
 		t.Fatalf("create command failed: %v", err)
 	}
@@ -97,7 +97,7 @@ func TestCLICommands(t *testing.T) {
 		t.Fatalf("expected create output, got %s", output)
 	}
 
-	output, err = run("create", "--tenant-name", "demo-config", "--image", "nginx:alpine", "--config", `{"env":{"FOO":"bar"}}`)
+	output, err = run("create", "--tenant-name", "demo-config", "--config", `{"image":"nginx:alpine","env":{"FOO":"bar"}}`)
 	if err != nil {
 		t.Fatalf("create with config failed: %v", err)
 	}
@@ -129,7 +129,7 @@ func TestCLICommands(t *testing.T) {
 		t.Fatalf("expected get output, got %s", output)
 	}
 
-	output, err = run("set", "--tenant-name", "demo", "--image", "nginx:1.25")
+	output, err = run("set", "--tenant-name", "demo", "--config", `{"image":"nginx:1.25"}`)
 	if err != nil {
 		t.Fatalf("set command failed: %v", err)
 	}

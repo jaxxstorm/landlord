@@ -13,6 +13,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jaxxstorm/landlord/internal/api/models"
+	computemock "github.com/jaxxstorm/landlord/internal/compute/providers/mock"
 	"github.com/jaxxstorm/landlord/internal/tenant"
 	"github.com/jaxxstorm/landlord/internal/workflow"
 )
@@ -123,15 +124,18 @@ func TestCreateTenantWithWorkflowTrigger(t *testing.T) {
 	tenantRepo := &mockTenantRepo{}
 
 	srv := &Server{
-		logger:         logger,
-		workflowClient: wfClient,
-		tenantRepo:     tenantRepo,
-		router:         nil, // Not needed for direct handler testing
+		logger:          logger,
+		workflowClient:  wfClient,
+		tenantRepo:      tenantRepo,
+		computeProvider: computemock.New(),
+		router:          nil, // Not needed for direct handler testing
 	}
 
 	reqBody := models.CreateTenantRequest{
-		Name:  "test-tenant",
-		Image: "nginx:latest",
+		Name: "test-tenant",
+		ComputeConfig: map[string]interface{}{
+			"image": "nginx:latest",
+		},
 	}
 
 	body, _ := json.Marshal(reqBody)
@@ -174,14 +178,17 @@ func TestCreateTenantWorkflowTriggerFailure(t *testing.T) {
 	tenantRepo := &mockTenantRepo{}
 
 	srv := &Server{
-		logger:         logger,
-		workflowClient: wfClient,
-		tenantRepo:     tenantRepo,
+		logger:          logger,
+		workflowClient:  wfClient,
+		tenantRepo:      tenantRepo,
+		computeProvider: computemock.New(),
 	}
 
 	reqBody := models.CreateTenantRequest{
-		Name:  "test-tenant",
-		Image: "nginx:latest",
+		Name: "test-tenant",
+		ComputeConfig: map[string]interface{}{
+			"image": "nginx:latest",
+		},
 	}
 
 	body, _ := json.Marshal(reqBody)
@@ -218,13 +225,16 @@ func TestUpdateTenantWithWorkflowTrigger(t *testing.T) {
 	}
 
 	srv := &Server{
-		logger:         logger,
-		workflowClient: wfClient,
-		tenantRepo:     tenantRepo,
+		logger:          logger,
+		workflowClient:  wfClient,
+		tenantRepo:      tenantRepo,
+		computeProvider: computemock.New(),
 	}
 
 	reqBody := models.UpdateTenantRequest{
-		Image: stringPtr("nginx:1.0"),
+		ComputeConfig: map[string]interface{}{
+			"image": "nginx:1.0",
+		},
 	}
 
 	body, _ := json.Marshal(reqBody)
@@ -281,13 +291,16 @@ func TestUpdateArchivedTenant(t *testing.T) {
 	}
 
 	srv := &Server{
-		logger:         logger,
-		workflowClient: wfClient,
-		tenantRepo:     tenantRepo,
+		logger:          logger,
+		workflowClient:  wfClient,
+		tenantRepo:      tenantRepo,
+		computeProvider: computemock.New(),
 	}
 
 	reqBody := models.UpdateTenantRequest{
-		Image: stringPtr("nginx:1.0"),
+		ComputeConfig: map[string]interface{}{
+			"image": "nginx:1.0",
+		},
 	}
 
 	body, _ := json.Marshal(reqBody)
@@ -327,9 +340,10 @@ func TestDeleteTenantWithWorkflowTrigger(t *testing.T) {
 	}
 
 	srv := &Server{
-		logger:         logger,
-		workflowClient: wfClient,
-		tenantRepo:     tenantRepo,
+		logger:          logger,
+		workflowClient:  wfClient,
+		tenantRepo:      tenantRepo,
+		computeProvider: computemock.New(),
 	}
 
 	req := httptest.NewRequest(http.MethodDelete, "/v1/tenants/"+tenantID.String(), nil)
@@ -380,9 +394,10 @@ func TestDeleteAlreadyDeletedTenant(t *testing.T) {
 	}
 
 	srv := &Server{
-		logger:         logger,
-		workflowClient: wfClient,
-		tenantRepo:     tenantRepo,
+		logger:          logger,
+		workflowClient:  wfClient,
+		tenantRepo:      tenantRepo,
+		computeProvider: computemock.New(),
 	}
 
 	req := httptest.NewRequest(http.MethodDelete, "/v1/tenants/"+tenantID.String(), nil)
@@ -421,8 +436,9 @@ func TestWorkflowExecutionIDInResponse(t *testing.T) {
 	}
 
 	srv := &Server{
-		logger:     logger,
-		tenantRepo: tenantRepo,
+		logger:          logger,
+		tenantRepo:      tenantRepo,
+		computeProvider: computemock.New(),
 	}
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/tenants/"+tenantID.String(), nil)
@@ -458,14 +474,17 @@ func TestAPITriggersIncludeTriggerSource(t *testing.T) {
 	tenantRepo := &mockTenantRepo{}
 
 	srv := &Server{
-		logger:         logger,
-		workflowClient: wfClient,
-		tenantRepo:     tenantRepo,
+		logger:          logger,
+		workflowClient:  wfClient,
+		tenantRepo:      tenantRepo,
+		computeProvider: computemock.New(),
 	}
 
 	reqBody := models.CreateTenantRequest{
-		Name:  "test-tenant",
-		Image: "nginx:latest",
+		Name: "test-tenant",
+		ComputeConfig: map[string]interface{}{
+			"image": "nginx:latest",
+		},
 	}
 
 	body, _ := json.Marshal(reqBody)
@@ -503,14 +522,17 @@ func TestCreateTenantWorkflowProviderUnavailable(t *testing.T) {
 	}
 
 	srv := &Server{
-		logger:         logger,
-		workflowClient: wfClient,
-		tenantRepo:     tenantRepo,
+		logger:          logger,
+		workflowClient:  wfClient,
+		tenantRepo:      tenantRepo,
+		computeProvider: computemock.New(),
 	}
 
 	reqBody := models.CreateTenantRequest{
-		Name:  "test-tenant",
-		Image: "nginx:latest",
+		Name: "test-tenant",
+		ComputeConfig: map[string]interface{}{
+			"image": "nginx:latest",
+		},
 	}
 
 	body, _ := json.Marshal(reqBody)
@@ -544,12 +566,15 @@ func TestUpdateTenantArchivedReturns409(t *testing.T) {
 	}
 
 	srv := &Server{
-		logger:     logger,
-		tenantRepo: tenantRepo,
+		logger:          logger,
+		tenantRepo:      tenantRepo,
+		computeProvider: computemock.New(),
 	}
 
 	reqBody := models.UpdateTenantRequest{
-		Image: stringPtr("nginx:2.0"),
+		ComputeConfig: map[string]interface{}{
+			"image": "nginx:2.0",
+		},
 	}
 
 	body, _ := json.Marshal(reqBody)
@@ -595,8 +620,9 @@ func TestDeleteTenantArchivedReturns200(t *testing.T) {
 	}
 
 	srv := &Server{
-		logger:     logger,
-		tenantRepo: tenantRepo,
+		logger:          logger,
+		tenantRepo:      tenantRepo,
+		computeProvider: computemock.New(),
 	}
 
 	req := httptest.NewRequest(http.MethodDelete, "/v1/tenants/"+tenantID.String(), nil)
@@ -633,12 +659,15 @@ func TestUpdateTenantInvalidStateTransition(t *testing.T) {
 	}
 
 	srv := &Server{
-		logger:     logger,
-		tenantRepo: tenantRepo,
+		logger:          logger,
+		tenantRepo:      tenantRepo,
+		computeProvider: computemock.New(),
 	}
 
 	reqBody := models.UpdateTenantRequest{
-		Image: stringPtr("nginx:2.0"),
+		ComputeConfig: map[string]interface{}{
+			"image": "nginx:2.0",
+		},
 	}
 
 	body, _ := json.Marshal(reqBody)

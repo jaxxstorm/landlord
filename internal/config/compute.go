@@ -9,6 +9,14 @@ import (
 type ComputeConfig struct {
 	DefaultProvider string        `mapstructure:"default_provider" env:"COMPUTE_DEFAULT_PROVIDER" default:"mock"`
 	Docker          *DockerConfig `mapstructure:"docker"`
+	Defaults        ComputeDefaults `mapstructure:"defaults"`
+}
+
+// ComputeDefaults holds default tenant compute_config values for providers.
+// These are merged with per-tenant compute_config at runtime.
+type ComputeDefaults struct {
+	Docker map[string]interface{} `mapstructure:"docker"`
+	ECS    map[string]interface{} `mapstructure:"ecs"`
 }
 
 // DockerConfig holds Docker provider configuration
@@ -34,6 +42,13 @@ type DockerConfig struct {
 func (c *ComputeConfig) Validate() error {
 	if c.DefaultProvider == "" {
 		return fmt.Errorf("default compute provider must be specified")
+	}
+
+	if len(c.Defaults.Docker) == 0 {
+		return fmt.Errorf("compute.defaults.docker is required")
+	}
+	if len(c.Defaults.ECS) == 0 {
+		return fmt.Errorf("compute.defaults.ecs is required")
 	}
 
 	if c.Docker != nil {

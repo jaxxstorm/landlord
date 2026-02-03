@@ -238,8 +238,8 @@ func TestReconcilerIntegration_SingleTenantProvisioning(t *testing.T) {
 		Name:          "test-tenant-1",
 		Status:        tenant.StatusRequested,
 		StatusMessage: "awaiting provisioning",
-		DesiredImage:  "myapp:v1",
 		DesiredConfig: map[string]interface{}{
+			"image":    "myapp:v1",
 			"replicas": "2",
 		},
 	}
@@ -273,10 +273,12 @@ func TestReconcilerIntegration_EndToEndProvisioning(t *testing.T) {
 	tenantID := uuid.New()
 
 	err := repo.CreateTenant(ctx, &tenant.Tenant{
-		ID:           tenantID,
-		Name:         "e2e-tenant",
-		Status:       tenant.StatusRequested,
-		DesiredImage: "nginx:latest",
+		ID:     tenantID,
+		Name:   "e2e-tenant",
+		Status: tenant.StatusRequested,
+		DesiredConfig: map[string]interface{}{
+			"image": "nginx:latest",
+		},
 	})
 	require.NoError(t, err)
 
@@ -318,10 +320,11 @@ func TestReconcilerIntegration_ListingForReconciliation(t *testing.T) {
 
 	for _, tc := range testCases {
 		tn := &tenant.Tenant{
-			Name:          tc.tenantID,
-			Status:        tc.status,
-			DesiredImage:  "app:v1",
-			DesiredConfig: map[string]interface{}{},
+			Name:   tc.tenantID,
+			Status: tc.status,
+			DesiredConfig: map[string]interface{}{
+				"image": "app:v1",
+			},
 		}
 		if err := repo.CreateTenant(ctx, tn); err != nil {
 			t.Fatalf("CreateTenant() error = %v", err)
@@ -355,16 +358,18 @@ func TestReconcilerIntegration_DeletedTenantsIgnored(t *testing.T) {
 
 	// Create two tenants
 	tn1 := &tenant.Tenant{
-		Name:          "active-tenant",
-		Status:        tenant.StatusRequested,
-		DesiredImage:  "app:v1",
-		DesiredConfig: map[string]interface{}{},
+		Name:   "active-tenant",
+		Status: tenant.StatusRequested,
+		DesiredConfig: map[string]interface{}{
+			"image": "app:v1",
+		},
 	}
 	tn2 := &tenant.Tenant{
-		Name:          "deleted-tenant",
-		Status:        tenant.StatusRequested,
-		DesiredImage:  "app:v1",
-		DesiredConfig: map[string]interface{}{},
+		Name:   "deleted-tenant",
+		Status: tenant.StatusRequested,
+		DesiredConfig: map[string]interface{}{
+			"image": "app:v1",
+		},
 	}
 
 	if err := repo.CreateTenant(ctx, tn1); err != nil {
@@ -402,10 +407,11 @@ func TestReconcilerIntegration_QueueDeduplication(t *testing.T) {
 
 	// Create a tenant
 	tn := &tenant.Tenant{
-		Name:          "dedup-test",
-		Status:        tenant.StatusRequested,
-		DesiredImage:  "app:v1",
-		DesiredConfig: map[string]interface{}{},
+		Name:   "dedup-test",
+		Status: tenant.StatusRequested,
+		DesiredConfig: map[string]interface{}{
+			"image": "app:v1",
+		},
 	}
 	if err := repo.CreateTenant(ctx, tn); err != nil {
 		t.Fatalf("CreateTenant() error = %v", err)
@@ -437,8 +443,9 @@ func TestReconcilerIntegration_MultipleTenantsInQueue(t *testing.T) {
 			Name:          tenantName,
 			Status:        tenant.StatusRequested,
 			StatusMessage: "test",
-			DesiredImage:  "app:v1",
-			DesiredConfig: map[string]interface{}{},
+			DesiredConfig: map[string]interface{}{
+				"image": "app:v1",
+			},
 		}
 		if err := repo.CreateTenant(ctx, tn); err != nil {
 			t.Fatalf("CreateTenant() error = %v", err)
@@ -486,8 +493,8 @@ func TestReconcilerIntegration_UpdateTenantPreservesData(t *testing.T) {
 		Name:          "data-tenant",
 		Status:        tenant.StatusRequested,
 		StatusMessage: "Initial setup",
-		DesiredImage:  "myapp:v1.2.3",
 		DesiredConfig: map[string]interface{}{
+			"image":       "myapp:v1.2.3",
 			"replicas":    "3",
 			"cpu":         "512m",
 			"memory":      "1Gi",
@@ -520,8 +527,8 @@ func TestReconcilerIntegration_UpdateTenantPreservesData(t *testing.T) {
 	}
 
 	// Check preserved fields
-	if updated.DesiredImage != tn.DesiredImage {
-		t.Errorf("DesiredImage = %s, want %s", updated.DesiredImage, tn.DesiredImage)
+	if updated.DesiredConfig["image"] != tn.DesiredConfig["image"] {
+		t.Errorf("DesiredConfig[image] = %v, want %v", updated.DesiredConfig["image"], tn.DesiredConfig["image"])
 	}
 	if value, ok := updated.DesiredConfig["replicas"].(string); !ok || value != "3" {
 		t.Errorf("DesiredConfig[replicas] = %v, want 3", updated.DesiredConfig["replicas"])
@@ -542,10 +549,11 @@ func TestReconcilerIntegration_TerminalStatusNotReconciled(t *testing.T) {
 
 	// Create a tenant in ready status
 	tn := &tenant.Tenant{
-		Name:          "ready-tenant",
-		Status:        tenant.StatusReady,
-		DesiredImage:  "app:v1",
-		DesiredConfig: map[string]interface{}{},
+		Name:   "ready-tenant",
+		Status: tenant.StatusReady,
+		DesiredConfig: map[string]interface{}{
+			"image": "app:v1",
+		},
 	}
 	if err := repo.CreateTenant(ctx, tn); err != nil {
 		t.Fatalf("CreateTenant() error = %v", err)

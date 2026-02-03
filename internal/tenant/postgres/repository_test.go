@@ -114,8 +114,8 @@ func createTestTenant(t *testing.T, tenantName string) *tenant.Tenant {
 		Name:          tenantName,
 		Status:        tenant.StatusRequested,
 		StatusMessage: "awaiting planning",
-		DesiredImage:  "myapp:v1",
 		DesiredConfig: map[string]interface{}{
+			"image":    "myapp:v1",
 			"replicas": "3",
 			"region":   "us-west-2",
 		},
@@ -202,9 +202,6 @@ func TestRepository_GetTenant(t *testing.T) {
 	if retrieved.Status != original.Status {
 		t.Errorf("GetTenantByName() Status = %v, want %v", retrieved.Status, original.Status)
 	}
-	if retrieved.DesiredImage != original.DesiredImage {
-		t.Errorf("GetTenantByName() DesiredImage = %v, want %v", retrieved.DesiredImage, original.DesiredImage)
-	}
 	if value, ok := retrieved.DesiredConfig["replicas"].(string); !ok || value != "3" {
 		t.Errorf("GetTenantByName() DesiredConfig[replicas] = %v, want 3", retrieved.DesiredConfig["replicas"])
 	}
@@ -235,7 +232,7 @@ func TestRepository_UpdateTenant(t *testing.T) {
 	originalVersion := tn.Version
 	tn.Status = tenant.StatusPlanning
 	tn.StatusMessage = "planning complete"
-	tn.DesiredImage = "myapp:v2"
+	tn.DesiredConfig["image"] = "myapp:v2"
 
 	err := repo.UpdateTenant(ctx, tn)
 	if err != nil {
@@ -256,8 +253,8 @@ func TestRepository_UpdateTenant(t *testing.T) {
 	if retrieved.Status != tenant.StatusPlanning {
 		t.Errorf("UpdateTenant() Status = %v, want %v", retrieved.Status, tenant.StatusPlanning)
 	}
-	if retrieved.DesiredImage != "myapp:v2" {
-		t.Errorf("UpdateTenant() DesiredImage = %v, want myapp:v2", retrieved.DesiredImage)
+	if value, ok := retrieved.DesiredConfig["image"].(string); !ok || value != "myapp:v2" {
+		t.Errorf("UpdateTenant() DesiredConfig[image] = %v, want myapp:v2", retrieved.DesiredConfig["image"])
 	}
 }
 

@@ -33,16 +33,16 @@ func TestClientCreateListDelete(t *testing.T) {
 		case r.Method == http.MethodPost && r.URL.Path == "/v1/tenants":
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusCreated)
-			_, _ = w.Write([]byte(`{"id":"123","name":"demo","status":"planning","desired_image":"nginx:alpine"}`))
+			_, _ = w.Write([]byte(`{"id":"123","name":"demo","status":"planning","desired_config":{"image":"nginx:alpine"},"compute_config":{"image":"nginx:alpine"}}`))
 		case r.Method == http.MethodPost && r.URL.Path == "/v1/tenants/123/archive":
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"id":"123","name":"demo","status":"archiving","desired_image":"nginx:alpine"}`))
+			_, _ = w.Write([]byte(`{"id":"123","name":"demo","status":"archiving","desired_config":{"image":"nginx:alpine"},"compute_config":{"image":"nginx:alpine"}}`))
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/tenants":
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"tenants":[{"id":"123","name":"demo","status":"archived","desired_image":"nginx:alpine"}],"total":1,"limit":50,"offset":0}`))
+			_, _ = w.Write([]byte(`{"tenants":[{"id":"123","name":"demo","status":"archived","desired_config":{"image":"nginx:alpine"},"compute_config":{"image":"nginx:alpine"}}],"total":1,"limit":50,"offset":0}`))
 		case r.Method == http.MethodDelete && r.URL.Path == "/v1/tenants/123":
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"id":"123","name":"demo","status":"deleting","desired_image":"nginx:alpine"}`))
+			_, _ = w.Write([]byte(`{"id":"123","name":"demo","status":"deleting","desired_config":{"image":"nginx:alpine"},"compute_config":{"image":"nginx:alpine"}}`))
 		default:
 			w.WriteHeader(http.StatusMethodNotAllowed)
 		}
@@ -51,8 +51,8 @@ func TestClientCreateListDelete(t *testing.T) {
 	client := NewClient(server.URL)
 
 	if _, err := client.CreateTenant(context.Background(), models.CreateTenantRequest{
-		Name:  "demo",
-		Image: "nginx:alpine",
+		Name:          "demo",
+		ComputeConfig: map[string]interface{}{"image": "nginx:alpine"},
 	}); err != nil {
 		t.Fatalf("create tenant failed: %v", err)
 	}
@@ -93,13 +93,13 @@ func TestClientGetUpdateTenant(t *testing.T) {
 		switch {
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/tenants":
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"tenants":[{"id":"123","name":"demo","status":"ready","desired_image":"nginx:alpine"}],"total":1,"limit":50,"offset":0}`))
+			_, _ = w.Write([]byte(`{"tenants":[{"id":"123","name":"demo","status":"ready","desired_config":{"image":"nginx:alpine"},"compute_config":{"image":"nginx:alpine"}}],"total":1,"limit":50,"offset":0}`))
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/tenants/123":
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"id":"123","name":"demo","status":"ready","desired_image":"nginx:alpine"}`))
+			_, _ = w.Write([]byte(`{"id":"123","name":"demo","status":"ready","desired_config":{"image":"nginx:alpine"},"compute_config":{"image":"nginx:alpine"}}`))
 		case r.Method == http.MethodPut && r.URL.Path == "/v1/tenants/123":
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"id":"123","name":"demo","status":"planning","desired_image":"nginx:1.25"}`))
+			_, _ = w.Write([]byte(`{"id":"123","name":"demo","status":"planning","desired_config":{"image":"nginx:1.25"},"compute_config":{"image":"nginx:1.25"}}`))
 		default:
 			w.WriteHeader(http.StatusNotFound)
 		}
@@ -111,8 +111,9 @@ func TestClientGetUpdateTenant(t *testing.T) {
 		t.Fatalf("get tenant failed: %v", err)
 	}
 
-	image := "nginx:1.25"
-	if _, err := client.UpdateTenant(context.Background(), "demo", http.MethodPut, models.UpdateTenantRequest{Image: &image}); err != nil {
+	if _, err := client.UpdateTenant(context.Background(), "demo", http.MethodPut, models.UpdateTenantRequest{
+		ComputeConfig: map[string]interface{}{"image": "nginx:1.25"},
+	}); err != nil {
 		t.Fatalf("update tenant failed: %v", err)
 	}
 }

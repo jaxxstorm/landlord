@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/jaxxstorm/landlord/internal/compute"
+	computedecs "github.com/jaxxstorm/landlord/internal/compute/providers/ecs"
 	computedocker "github.com/jaxxstorm/landlord/internal/compute/providers/docker"
 	computemock "github.com/jaxxstorm/landlord/internal/compute/providers/mock"
 	"github.com/jaxxstorm/landlord/internal/config"
@@ -32,12 +33,14 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Failed to find config file: %v\n", err)
 		os.Exit(1)
 	}
+	if configFile == "" {
+		fmt.Fprintln(os.Stderr, "Config file is required for startup")
+		os.Exit(1)
+	}
 
-	if configFile != "" {
-		if err := config.LoadConfigFile(v, configFile); err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to load config file: %v\n", err)
-			os.Exit(1)
-		}
+	if err := config.LoadConfigFile(v, configFile); err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to load config file: %v\n", err)
+		os.Exit(1)
 	}
 
 	cfg, err := config.LoadFromViper(v)
@@ -61,6 +64,7 @@ func main() {
 	// Initialize compute registry and register providers
 	computeRegistry := compute.NewRegistry(log)
 	computeRegistry.Register(computemock.New())
+	computeRegistry.Register(computedecs.New(log, cfg.Compute.Defaults.ECS))
 
 	// Register Docker provider if configured
 	if cfg.Compute.Docker != nil {
@@ -72,6 +76,7 @@ func main() {
 				NetworkDriver: cfg.Compute.Docker.NetworkDriver,
 				LabelPrefix:   cfg.Compute.Docker.LabelPrefix,
 			},
+			cfg.Compute.Defaults.Docker,
 			log,
 		)
 		if err != nil {

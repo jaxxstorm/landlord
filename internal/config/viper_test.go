@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -207,6 +208,7 @@ func TestLoadConfigFile_UnsupportedExtension(t *testing.T) {
 
 func TestLoadFromViper_Valid(t *testing.T) {
 	v := NewViperInstance()
+	setComputeDefaults(v)
 
 	// Set some values
 	v.Set("database.host", "testhost")
@@ -229,6 +231,7 @@ func TestLoadFromViper_Valid(t *testing.T) {
 
 func TestLoadFromViper_InvalidConfig(t *testing.T) {
 	v := NewViperInstance()
+	setComputeDefaults(v)
 
 	// Set invalid values that will fail validation
 	v.Set("database.port", 99999) // Invalid port
@@ -240,6 +243,7 @@ func TestLoadFromViper_InvalidConfig(t *testing.T) {
 
 func TestLoadFromViper_DefaultValues(t *testing.T) {
 	v := NewViperInstance()
+	setComputeDefaults(v)
 
 	// Set only required fields
 	v.Set("database.user", "user")
@@ -285,6 +289,7 @@ func TestConfigPrecedence_CLIOverridesEnv(t *testing.T) {
 
 func TestConfigDurationParsing(t *testing.T) {
 	v := NewViperInstance()
+	setComputeDefaults(v)
 
 	v.Set("database.connect_timeout", "5s")
 	v.Set("http.shutdown_timeout", "15s")
@@ -298,6 +303,7 @@ func TestConfigDurationParsing(t *testing.T) {
 
 func TestConfigNestedStructMarshaling(t *testing.T) {
 	v := NewViperInstance()
+	setComputeDefaults(v)
 
 	// Set nested values
 	v.Set("workflow.step_functions.region", "us-east-1")
@@ -308,4 +314,14 @@ func TestConfigNestedStructMarshaling(t *testing.T) {
 
 	assert.Equal(t, "us-east-1", cfg.Workflow.StepFunctions.Region)
 	assert.Equal(t, "arn:aws:iam::123456789:role/sfn", cfg.Workflow.StepFunctions.RoleARN)
+}
+
+func setComputeDefaults(v *viper.Viper) {
+	v.Set("compute.defaults.docker", map[string]interface{}{
+		"image": "nginx:latest",
+	})
+	v.Set("compute.defaults.ecs", map[string]interface{}{
+		"cluster_arn":         "arn:aws:ecs:us-east-1:123456789012:cluster/test",
+		"task_definition_arn": "arn:aws:ecs:us-east-1:123456789012:task-definition/test:1",
+	})
 }

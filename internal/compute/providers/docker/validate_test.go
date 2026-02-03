@@ -9,7 +9,7 @@ import (
 
 func TestProvider_ValidateConfig(t *testing.T) {
 	logger := zaptest.NewLogger(t)
-	provider, err := New(&Config{}, logger)
+	provider, err := New(&Config{}, map[string]interface{}{"image": "nginx:latest"}, logger)
 	if err != nil {
 		t.Skipf("skipping docker provider validation: %v", err)
 	}

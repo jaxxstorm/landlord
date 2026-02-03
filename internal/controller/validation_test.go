@@ -21,8 +21,8 @@ func TestValidation_CreateTenantViaAPIAndReconcile(t *testing.T) {
 		Name:          "validation-test-1",
 		Status:        tenant.StatusRequested,
 		StatusMessage: "Test tenant for validation",
-		DesiredImage:  "myapp:v1.0.0",
 		DesiredConfig: map[string]interface{}{
+			"image":    "myapp:v1.0.0",
 			"replicas": "2",
 			"cpu":      "512m",
 			"memory":   "1Gi",
@@ -72,8 +72,8 @@ func TestValidation_CreateTenantViaAPIAndReconcile(t *testing.T) {
 	}
 
 	// Verify original data was preserved
-	if updated.DesiredImage != "myapp:v1.0.0" {
-		t.Errorf("DesiredImage not preserved: got %s", updated.DesiredImage)
+	if value, ok := updated.DesiredConfig["image"].(string); !ok || value != "myapp:v1.0.0" {
+		t.Errorf("DesiredConfig[image] not preserved: got %v", updated.DesiredConfig["image"])
 	}
 	if value, ok := updated.DesiredConfig["replicas"].(string); !ok || value != "2" {
 		t.Errorf("DesiredConfig not preserved: got %v", updated.DesiredConfig)
@@ -139,8 +139,9 @@ func TestValidation_StateMachineTransitions(t *testing.T) {
 				ID:            uuid.New(),
 				Name:          "state-test-" + tc.name,
 				Status:        tc.initialStatus,
-				DesiredImage:  "app:v1",
-				DesiredConfig: map[string]interface{}{},
+				DesiredConfig: map[string]interface{}{
+					"image": "app:v1",
+				},
 			}
 
 			if err := repo.CreateTenant(ctx, tn); err != nil {
@@ -224,8 +225,10 @@ func TestValidation_WorkflowProviderInvocation(t *testing.T) {
 				ID:            uuid.New(),
 				Name:          tc.expectedTenantName,
 				Status:        tc.initialStatus,
-				DesiredImage:  "myapp:latest",
-				DesiredConfig: map[string]interface{}{"env": "test"},
+				DesiredConfig: map[string]interface{}{
+					"image": "myapp:latest",
+					"env":   "test",
+				},
 			}
 
 			if err := repo.CreateTenant(ctx, tn); err != nil {

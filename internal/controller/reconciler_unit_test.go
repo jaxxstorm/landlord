@@ -253,7 +253,9 @@ func TestReconciler_InvokesWorkflowForRequestedTenant(t *testing.T) {
 		ID:           tenantID,
 		Name:         "requested-tenant",
 		Status:       tenant.StatusRequested,
-		DesiredImage: "nginx:latest",
+		DesiredConfig: map[string]interface{}{
+			"image": "nginx:latest",
+		},
 	})
 	require.NoError(t, err)
 
@@ -288,8 +290,10 @@ func TestReconciler_UpdatesTenantOnWorkflowSuccess(t *testing.T) {
 		TenantID:      "provisioned-tenant",
 		TenantUUID:    tenantID.String(),
 		Operation:     "provision",
-		DesiredImage:  "nginx:latest",
-		DesiredConfig: map[string]interface{}{"replicas": "1"},
+		DesiredConfig: map[string]interface{}{
+			"image":    "nginx:latest",
+			"replicas": "1",
+		},
 	}
 	execResult, err := manager.Invoke(context.Background(), workflowID, "mock", request)
 	require.NoError(t, err)
@@ -299,7 +303,9 @@ func TestReconciler_UpdatesTenantOnWorkflowSuccess(t *testing.T) {
 		Name:                "provisioned-tenant",
 		Status:              tenant.StatusProvisioning,
 		WorkflowExecutionID: &execResult.ExecutionID,
-		DesiredImage:        "nginx:latest",
+		DesiredConfig: map[string]interface{}{
+			"image": "nginx:latest",
+		},
 	})
 	require.NoError(t, err)
 

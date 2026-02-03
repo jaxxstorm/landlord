@@ -51,20 +51,12 @@ func renderTenantDetails(tenant models.TenantResponse) string {
 		lines = append(lines, fmt.Sprintf("%s %s", labelStyle.Render("Workflow Execution ID:"), *tenant.WorkflowExecutionID))
 	}
 
-	if tenant.DesiredImage != "" {
-		lines = append(lines, fmt.Sprintf("%s %s", labelStyle.Render("Image:"), tenant.DesiredImage))
-	}
-
 	if len(tenant.DesiredConfig) > 0 {
 		lines = append(lines, fmt.Sprintf("%s %s", labelStyle.Render("Config:"), formatMap(tenant.DesiredConfig)))
 	}
 
 	if len(tenant.ComputeConfig) > 0 {
 		lines = append(lines, fmt.Sprintf("%s %s", labelStyle.Render("Compute:"), formatMap(tenant.ComputeConfig)))
-	}
-
-	if tenant.ObservedImage != "" {
-		lines = append(lines, fmt.Sprintf("%s %s", labelStyle.Render("Observed Image:"), tenant.ObservedImage))
 	}
 
 	if len(tenant.ObservedConfig) > 0 {

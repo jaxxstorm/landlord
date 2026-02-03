@@ -14,9 +14,10 @@ import (
 // TestNewProvider tests creating a new Docker provider
 func TestNewProvider(t *testing.T) {
 	logger := zap.NewNop()
+	defaults := map[string]interface{}{"image": "nginx:latest"}
 
 	t.Run("creates provider successfully", func(t *testing.T) {
-		provider, err := New(&Config{}, logger)
+		provider, err := New(&Config{}, defaults, logger)
 		if err != nil {
 			// Skip test if Docker daemon is not available
 			t.Skip("Docker daemon not available:", err)
@@ -34,7 +35,7 @@ func TestNewProvider(t *testing.T) {
 			NetworkDriver: "",
 			LabelPrefix:   "",
 		}
-		provider, err := New(cfg, logger)
+		provider, err := New(cfg, defaults, logger)
 		if err != nil {
 			t.Skip("Docker daemon not available:", err)
 		}
@@ -44,7 +45,7 @@ func TestNewProvider(t *testing.T) {
 	})
 
 	t.Run("handles nil config", func(t *testing.T) {
-		provider, err := New(nil, logger)
+		provider, err := New(nil, defaults, logger)
 		if err != nil {
 			t.Skip("Docker daemon not available:", err)
 		}
@@ -57,7 +58,7 @@ func TestNewProvider(t *testing.T) {
 // TestValidate tests spec validation
 func TestValidate(t *testing.T) {
 	logger := zap.NewNop()
-	provider, err := New(&Config{}, logger)
+	provider, err := New(&Config{}, nil, logger)
 	if err != nil {
 		t.Skip("Docker daemon not available:", err)
 	}
@@ -126,7 +127,7 @@ func TestValidate(t *testing.T) {
 // TestName tests the provider name
 func TestName(t *testing.T) {
 	logger := zap.NewNop()
-	provider, err := New(&Config{}, logger)
+	provider, err := New(&Config{}, map[string]interface{}{"image": "nginx:latest"}, logger)
 	if err != nil {
 		t.Skip("Docker daemon not available:", err)
 	}
@@ -138,7 +139,7 @@ func TestName(t *testing.T) {
 // TestProvisionValidation tests that provision validates input
 func TestProvisionValidation(t *testing.T) {
 	logger := zap.NewNop()
-	provider, err := New(&Config{}, logger)
+	provider, err := New(&Config{}, map[string]interface{}{"image": "nginx:latest"}, logger)
 	if err != nil {
 		t.Skip("Docker daemon not available:", err)
 	}
@@ -233,7 +234,7 @@ func TestHelperFunctions(t *testing.T) {
 			TenantID:     "tenant-123",
 			ProviderType: "docker",
 			Labels: map[string]string{
-				"custom":              "value",
+				"custom":                    "value",
 				compute.MetadataOwnerKey:    "override",
 				compute.MetadataTenantIDKey: "override",
 			},

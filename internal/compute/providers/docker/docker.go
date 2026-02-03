@@ -24,6 +24,8 @@ type Provider struct {
 	mu     sync.RWMutex
 	client *client.Client
 	logger *zap.Logger
+	defaultConfig    map[string]interface{}
+	defaultConfigRaw json.RawMessage
 	// tenantContainers maps tenant IDs to container IDs
 	tenantContainers map[string]string
 	// tenantSpecs stores the specs for provisioned tenants
@@ -57,7 +59,7 @@ const (
 )
 
 // New creates a new Docker provider
-func New(cfg *Config, logger *zap.Logger) (*Provider, error) {
+func New(cfg *Config, defaults map[string]interface{}, logger *zap.Logger) (*Provider, error) {
 	if cfg == nil {
 		cfg = &Config{}
 	}
@@ -107,6 +109,8 @@ func New(cfg *Config, logger *zap.Logger) (*Provider, error) {
 	p := &Provider{
 		client:           cli,
 		logger:           logger,
+		defaultConfig:    copyConfigMap(defaults),
+		defaultConfigRaw: marshalConfigMap(defaults),
 		tenantContainers: make(map[string]string),
 		tenantSpecs:      make(map[string]*compute.TenantComputeSpec),
 	}
@@ -134,8 +138,11 @@ func (p *Provider) Provision(ctx context.Context, spec *compute.TenantComputeSpe
 		return nil, fmt.Errorf("docker provider expects exactly 1 container, got %d", len(spec.Containers))
 	}
 
-	parsedConfig, err := applyProviderConfig(spec)
+	parsedConfig, err := parseProviderConfig(p.defaultConfig, spec.ProviderConfig)
 	if err != nil {
+		return nil, err
+	}
+	if err := applyProviderConfig(spec, parsedConfig); err != nil {
 		return nil, err
 	}
 
@@ -266,7 +273,11 @@ func (p *Provider) Update(ctx context.Context, tenantID string, spec *compute.Te
 	oldSpec := p.tenantSpecs[tenantID]
 	changes := []string{}
 
-	if _, err := applyProviderConfig(spec); err != nil {
+	parsedConfig, err := parseProviderConfig(p.defaultConfig, spec.ProviderConfig)
+	if err != nil {
+		return nil, err
+	}
+	if err := applyProviderConfig(spec, parsedConfig); err != nil {
 		return nil, err
 	}
 
@@ -412,11 +423,19 @@ func (p *Provider) Validate(ctx context.Context, spec *compute.TenantComputeSpec
 		return fmt.Errorf("docker provider requires exactly 1 container, got %d", len(spec.Containers))
 	}
 
+	parsedConfig, err := parseProviderConfig(p.defaultConfig, spec.ProviderConfig)
+	if err != nil {
+		return err
+	}
+	if err := applyProviderConfig(spec, parsedConfig); err != nil {
+		return err
+	}
+
 	containerSpec := spec.Containers[0]
 
 	// Validate container image
 	if containerSpec.Image == "" {
-		return fmt.Errorf("container image cannot be empty")
+		return fmt.Errorf("container image is required")
 	}
 
 	// Basic image format validation
@@ -439,8 +458,11 @@ func (p *Provider) provisionInternal(ctx context.Context, spec *compute.TenantCo
 		return nil, fmt.Errorf("docker provider expects exactly 1 container, got %d", len(spec.Containers))
 	}
 
-	parsedConfig, err := applyProviderConfig(spec)
+	parsedConfig, err := parseProviderConfig(p.defaultConfig, spec.ProviderConfig)
 	if err != nil {
+		return nil, err
+	}
+	if err := applyProviderConfig(spec, parsedConfig); err != nil {
 		return nil, err
 	}
 
@@ -694,6 +716,9 @@ func isValidImageRef(image string) bool {
 
 // DockerComputeConfig represents Docker-specific tenant configuration
 type DockerComputeConfig struct {
+	// Image is the container image reference.
+	Image string `json:"image,omitempty"`
+
 	// Env is environment variables for the container
 	Env map[string]string `json:"env,omitempty"`
 
@@ -720,20 +745,34 @@ type PortConfig struct {
 	Protocol      string `json:"protocol,omitempty"` // tcp or udp
 }
 
-func applyProviderConfig(spec *compute.TenantComputeSpec) (*DockerComputeConfig, error) {
-	if spec == nil || len(spec.ProviderConfig) == 0 {
-		return nil, nil
+func parseProviderConfig(defaults map[string]interface{}, raw json.RawMessage) (*DockerComputeConfig, error) {
+	mergedRaw, err := compute.MergeConfigJSON(defaults, raw)
+	if err != nil {
+		return nil, fmt.Errorf("merge provider config: %w", err)
 	}
-	if len(spec.Containers) != 1 {
-		return nil, fmt.Errorf("docker provider expects exactly 1 container, got %d", len(spec.Containers))
+	if len(mergedRaw) == 0 {
+		return nil, nil
 	}
 
 	var dockerConfig DockerComputeConfig
-	if err := json.Unmarshal(spec.ProviderConfig, &dockerConfig); err != nil {
+	if err := json.Unmarshal(mergedRaw, &dockerConfig); err != nil {
 		return nil, fmt.Errorf("invalid provider config: %w", err)
+	}
+	return &dockerConfig, nil
+}
+
+func applyProviderConfig(spec *compute.TenantComputeSpec, dockerConfig *DockerComputeConfig) error {
+	if spec == nil || dockerConfig == nil {
+		return nil
+	}
+	if len(spec.Containers) != 1 {
+		return fmt.Errorf("docker provider expects exactly 1 container, got %d", len(spec.Containers))
 	}
 
 	containerSpec := &spec.Containers[0]
+	if dockerConfig.Image != "" {
+		containerSpec.Image = dockerConfig.Image
+	}
 	if len(dockerConfig.Env) > 0 {
 		containerSpec.Env = dockerConfig.Env
 	}
@@ -741,7 +780,7 @@ func applyProviderConfig(spec *compute.TenantComputeSpec) (*DockerComputeConfig,
 		containerSpec.Ports = toPortMappings(dockerConfig.Ports)
 	}
 
-	return &dockerConfig, nil
+	return nil
 }
 
 func toPortMappings(ports []PortConfig) []compute.PortMapping {
@@ -763,10 +802,33 @@ func toPortMappings(ports []PortConfig) []compute.PortMapping {
 	return mappings
 }
 
+func copyConfigMap(input map[string]interface{}) map[string]interface{} {
+	if len(input) == 0 {
+		return nil
+	}
+	output := make(map[string]interface{}, len(input))
+	for k, v := range input {
+		output[k] = v
+	}
+	return output
+}
+
+func marshalConfigMap(input map[string]interface{}) json.RawMessage {
+	if len(input) == 0 {
+		return nil
+	}
+	raw, err := json.Marshal(input)
+	if err != nil {
+		return nil
+	}
+	return raw
+}
+
 var dockerConfigSchema = json.RawMessage(`{
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "properties": {
+    "image": { "type": "string" },
     "env": {
       "type": "object",
       "additionalProperties": { "type": "string" }
@@ -800,20 +862,23 @@ var dockerConfigSchema = json.RawMessage(`{
 
 // ValidateConfig validates Docker-specific configuration
 func (p *Provider) ValidateConfig(config json.RawMessage) error {
-	if len(config) == 0 {
+	parsedConfig, err := parseProviderConfig(p.defaultConfig, config)
+	if err != nil {
+		return fmt.Errorf("invalid JSON structure: %w", err)
+	}
+	if parsedConfig == nil {
 		// Empty config is valid - will use defaults
 		return nil
 	}
 
-	var dockerConfig DockerComputeConfig
-	if err := json.Unmarshal(config, &dockerConfig); err != nil {
-		return fmt.Errorf("invalid JSON structure: %w", err)
-	}
-
 	var errors []string
 
+	if parsedConfig.Image == "" {
+		errors = append(errors, "image is required")
+	}
+
 	// Validate volumes format
-	for i, vol := range dockerConfig.Volumes {
+	for i, vol := range parsedConfig.Volumes {
 		parts := strings.Split(vol, ":")
 		if len(parts) < 2 || len(parts) > 3 {
 			errors = append(errors, fmt.Sprintf("volumes[%d]: invalid format '%s', expected 'host_path:container_path' or 'host_path:container_path:mode'", i, vol))
@@ -825,23 +890,23 @@ func (p *Provider) ValidateConfig(config json.RawMessage) error {
 	}
 
 	// Validate network mode
-	if dockerConfig.NetworkMode != "" {
+	if parsedConfig.NetworkMode != "" {
 		validModes := []string{"bridge", "host", "none"}
 		isValid := false
 		for _, mode := range validModes {
-			if dockerConfig.NetworkMode == mode {
+			if parsedConfig.NetworkMode == mode {
 				isValid = true
 				break
 			}
 		}
 		// Also allow container:<name> format
-		if !isValid && !strings.HasPrefix(dockerConfig.NetworkMode, "container:") {
-			errors = append(errors, fmt.Sprintf("network_mode: invalid value '%s', must be one of: bridge, host, none, or container:<name>", dockerConfig.NetworkMode))
+		if !isValid && !strings.HasPrefix(parsedConfig.NetworkMode, "container:") {
+			errors = append(errors, fmt.Sprintf("network_mode: invalid value '%s', must be one of: bridge, host, none, or container:<name>", parsedConfig.NetworkMode))
 		}
 	}
 
 	// Validate ports
-	for i, port := range dockerConfig.Ports {
+	for i, port := range parsedConfig.Ports {
 		if port.ContainerPort < 1 || port.ContainerPort > 65535 {
 			errors = append(errors, fmt.Sprintf("ports[%d].container_port: must be between 1 and 65535, got %d", i, port.ContainerPort))
 		}
@@ -854,22 +919,22 @@ func (p *Provider) ValidateConfig(config json.RawMessage) error {
 	}
 
 	// Validate restart policy
-	if dockerConfig.RestartPolicy != "" {
+	if parsedConfig.RestartPolicy != "" {
 		validPolicies := []string{"no", "always", "on-failure", "unless-stopped"}
 		isValid := false
 		for _, policy := range validPolicies {
-			if dockerConfig.RestartPolicy == policy {
+			if parsedConfig.RestartPolicy == policy {
 				isValid = true
 				break
 			}
 		}
 		if !isValid {
-			errors = append(errors, fmt.Sprintf("restart_policy: invalid value '%s', must be one of: no, always, on-failure, unless-stopped", dockerConfig.RestartPolicy))
+			errors = append(errors, fmt.Sprintf("restart_policy: invalid value '%s', must be one of: no, always, on-failure, unless-stopped", parsedConfig.RestartPolicy))
 		}
 	}
 
 	// Validate environment variable names
-	for key := range dockerConfig.Env {
+	for key := range parsedConfig.Env {
 		if key == "" {
 			errors = append(errors, "env: environment variable name cannot be empty")
 		}
@@ -892,5 +957,5 @@ func (p *Provider) ConfigSchema() json.RawMessage {
 
 // ConfigDefaults returns defaults for Docker compute_config (none defined).
 func (p *Provider) ConfigDefaults() json.RawMessage {
-	return nil
+	return p.defaultConfigRaw
 }

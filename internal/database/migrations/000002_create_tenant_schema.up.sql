@@ -9,11 +9,9 @@ CREATE TABLE tenants (
     status_message TEXT,
     
     -- Desired state
-    desired_image VARCHAR(255) NOT NULL,
     desired_config JSON NOT NULL DEFAULT '{}',
     
     -- Observed state
-    observed_image VARCHAR(255),
     observed_config JSON NOT NULL DEFAULT '{}',
     observed_resource_ids JSON NOT NULL DEFAULT '{}',
     

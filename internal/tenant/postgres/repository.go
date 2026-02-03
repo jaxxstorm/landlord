@@ -37,10 +37,10 @@ func New(pool interface{}, logger *zap.Logger) (*Repository, error) {
 const createTenantQuery = `
 INSERT INTO tenants (
     id, name, status, status_message,
-    desired_image, desired_config,
+    desired_config,
     labels, annotations
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8
+    $1, $2, $3, $4, $5, $6, $7
 )
 RETURNING created_at, updated_at, version
 `
@@ -61,7 +61,6 @@ func (r *Repository) CreateTenant(ctx context.Context, t *tenant.Tenant) error {
 		t.Name,
 		t.Status,
 		t.StatusMessage,
-		t.DesiredImage,
 		jsonbOrEmptyInterfaceMap(t.DesiredConfig),
 		jsonbOrEmptyStringMap(t.Labels),
 		jsonbOrEmptyStringMap(t.Annotations),
@@ -85,8 +84,8 @@ func (r *Repository) CreateTenant(ctx context.Context, t *tenant.Tenant) error {
 const getTenantQuery = `
 SELECT
     id, name, status, status_message,
-    desired_image, desired_config,
-    observed_image, observed_config, observed_resource_ids,
+    desired_config,
+    observed_config, observed_resource_ids,
     created_at, updated_at,
     version, labels, annotations, workflow_execution_id
 FROM tenants
@@ -98,16 +97,13 @@ func (r *Repository) GetTenantByName(ctx context.Context, name string) (*tenant.
 
 	t := &tenant.Tenant{}
 	var desiredConfigJSON, observedConfigJSON, observedResourceIDsJSON, labelsJSON, annotationsJSON []byte
-	var observedImage *string // nullable field
 
 	err := r.pool.QueryRow(ctx, getTenantQuery, name).Scan(
 		&t.ID,
 		&t.Name,
 		&t.Status,
 		&t.StatusMessage,
-		&t.DesiredImage,
 		&desiredConfigJSON,
-		&observedImage,
 		&observedConfigJSON,
 		&observedResourceIDsJSON,
 		&t.CreatedAt,
@@ -123,11 +119,6 @@ func (r *Repository) GetTenantByName(ctx context.Context, name string) (*tenant.
 			return nil, tenant.ErrTenantNotFound
 		}
 		return nil, fmt.Errorf("get tenant: %w", err)
-	}
-
-	// Set observed_image if not null
-	if observedImage != nil {
-		t.ObservedImage = *observedImage
 	}
 
 	// Unmarshal JSONB fields
@@ -153,8 +144,8 @@ func (r *Repository) GetTenantByName(ctx context.Context, name string) (*tenant.
 const getTenantByIDQuery = `
 SELECT
     id, name, status, status_message,
-    desired_image, desired_config,
-    observed_image, observed_config, observed_resource_ids,
+    desired_config,
+    observed_config, observed_resource_ids,
     created_at, updated_at,
     version, labels, annotations, workflow_execution_id
 FROM tenants
@@ -166,16 +157,13 @@ func (r *Repository) GetTenantByID(ctx context.Context, id uuid.UUID) (*tenant.T
 
 	t := &tenant.Tenant{}
 	var desiredConfigJSON, observedConfigJSON, observedResourceIDsJSON, labelsJSON, annotationsJSON []byte
-	var observedImage *string // nullable field
 
 	err := r.pool.QueryRow(ctx, getTenantByIDQuery, id).Scan(
 		&t.ID,
 		&t.Name,
 		&t.Status,
 		&t.StatusMessage,
-		&t.DesiredImage,
 		&desiredConfigJSON,
-		&observedImage,
 		&observedConfigJSON,
 		&observedResourceIDsJSON,
 		&t.CreatedAt,
@@ -191,11 +179,6 @@ func (r *Repository) GetTenantByID(ctx context.Context, id uuid.UUID) (*tenant.T
 			return nil, tenant.ErrTenantNotFound
 		}
 		return nil, fmt.Errorf("get tenant by ID: %w", err)
-	}
-
-	// Set observed_image if not null
-	if observedImage != nil {
-		t.ObservedImage = *observedImage
 	}
 
 	// Unmarshal JSONB fields
@@ -223,17 +206,15 @@ UPDATE tenants SET
     name = $2,
     status = $3,
     status_message = $4,
-    desired_image = $5,
-    desired_config = $6,
-    observed_image = $7,
-    observed_config = $8,
-    observed_resource_ids = $9,
+    desired_config = $5,
+    observed_config = $6,
+    observed_resource_ids = $7,
     updated_at = NOW(),
     version = version + 1,
-    labels = $10,
-    annotations = $11,
-    workflow_execution_id = $12
-WHERE id = $1 AND version = $13
+    labels = $8,
+    annotations = $9,
+    workflow_execution_id = $10
+WHERE id = $1 AND version = $11
 RETURNING version, updated_at
 `
 
@@ -247,9 +228,7 @@ func (r *Repository) UpdateTenant(ctx context.Context, t *tenant.Tenant) error {
 		t.Name,
 		t.Status,
 		t.StatusMessage,
-		t.DesiredImage,
 		jsonbOrEmptyInterfaceMap(t.DesiredConfig),
-		t.ObservedImage,
 		jsonbOrEmptyInterfaceMap(t.ObservedConfig),
 		jsonbOrEmptyStringMap(t.ObservedResourceIDs),
 		jsonbOrEmptyStringMap(t.Labels),
@@ -297,23 +276,17 @@ func (r *Repository) ListTenants(ctx context.Context, filters tenant.ListFilters
 	for rows.Next() {
 		t := &tenant.Tenant{}
 		var desiredConfigJSON, observedConfigJSON, observedResourceIDsJSON, labelsJSON, annotationsJSON []byte
-		var observedImage *string // nullable field
 
 		err := rows.Scan(
 			&t.ID, &t.Name, &t.Status, &t.StatusMessage,
-			&t.DesiredImage, &desiredConfigJSON,
-			&observedImage, &observedConfigJSON, &observedResourceIDsJSON,
+			&desiredConfigJSON,
+			&observedConfigJSON, &observedResourceIDsJSON,
 			&t.CreatedAt, &t.UpdatedAt,
 			&t.Version, &labelsJSON, &annotationsJSON,
 			&t.WorkflowExecutionID,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("scan tenant: %w", err)
-		}
-
-		// Set observed_image if not null
-		if observedImage != nil {
-			t.ObservedImage = *observedImage
 		}
 
 		// Unmarshal JSONB fields
@@ -346,8 +319,8 @@ func (r *Repository) ListTenants(ctx context.Context, filters tenant.ListFilters
 const listTenantsForReconciliationQuery = `
 SELECT
     id, name, status, status_message,
-    desired_image, desired_config,
-    observed_image, observed_config, observed_resource_ids,
+    desired_config,
+    observed_config, observed_resource_ids,
     created_at, updated_at,
     version, labels, annotations, workflow_execution_id
 FROM tenants
@@ -368,23 +341,17 @@ func (r *Repository) ListTenantsForReconciliation(ctx context.Context) ([]*tenan
 	for rows.Next() {
 		t := &tenant.Tenant{}
 		var desiredConfigJSON, observedConfigJSON, observedResourceIDsJSON, labelsJSON, annotationsJSON []byte
-		var observedImage *string // nullable field
 
 		err := rows.Scan(
 			&t.ID, &t.Name, &t.Status, &t.StatusMessage,
-			&t.DesiredImage, &desiredConfigJSON,
-			&observedImage, &observedConfigJSON, &observedResourceIDsJSON,
+			&desiredConfigJSON,
+			&observedConfigJSON, &observedResourceIDsJSON,
 			&t.CreatedAt, &t.UpdatedAt,
 			&t.Version, &labelsJSON, &annotationsJSON,
 			&t.WorkflowExecutionID,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("scan tenant: %w", err)
-		}
-
-		// Set observed_image if not null
-		if observedImage != nil {
-			t.ObservedImage = *observedImage
 		}
 
 		// Unmarshal JSONB fields
@@ -419,8 +386,8 @@ func (r *Repository) buildListQuery(filters tenant.ListFilters) (string, []inter
 	query := `
         SELECT
             id, name, status, status_message,
-            desired_image, desired_config,
-            observed_image, observed_config, observed_resource_ids,
+            desired_config,
+            observed_config, observed_resource_ids,
             created_at, updated_at,
             version, labels, annotations, workflow_execution_id
         FROM tenants

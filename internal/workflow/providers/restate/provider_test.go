@@ -155,8 +155,7 @@ func TestInvoke(t *testing.T) {
 		TenantID:      "tenant-1",
 		TenantUUID:    "tenant-uuid-1",
 		Operation:     "provision",
-		DesiredImage:  "nginx:latest",
-		DesiredConfig: map[string]interface{}{"replicas": "1"},
+		DesiredConfig: map[string]interface{}{"image": "nginx:latest", "replicas": "1"},
 	}
 
 	result, err := provider.Invoke(ctx, "test-workflow", request)
@@ -173,8 +172,8 @@ func TestInvoke(t *testing.T) {
 	assert.Equal(t, "tenant-1", captured["tenant_id"])
 	assert.Equal(t, "tenant-uuid-1", captured["tenant_uuid"])
 	assert.Equal(t, "provision", captured["operation"])
-	assert.Equal(t, "nginx:latest", captured["desired_image"])
 	if desiredConfig, ok := captured["desired_config"].(map[string]interface{}); ok {
+		assert.Equal(t, "nginx:latest", desiredConfig["image"])
 		assert.Equal(t, "1", desiredConfig["replicas"])
 	} else {
 		t.Fatalf("expected desired_config to be an object, got %T", captured["desired_config"])

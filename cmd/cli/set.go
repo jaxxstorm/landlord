@@ -15,7 +15,6 @@ import (
 func newSetCommand() *cobra.Command {
 	var tenantID string
 	var tenantName string
-	var image string
 	var config string
 	var usePatch bool
 
@@ -30,14 +29,11 @@ func newSetCommand() *cobra.Command {
 			if target == "" {
 				return fmt.Errorf("tenant-id or tenant-name is required")
 			}
-			if image == "" && config == "" {
-				return fmt.Errorf("either image or config must be provided")
+			if config == "" {
+				return fmt.Errorf("config is required")
 			}
 
 			req := models.UpdateTenantRequest{}
-			if image != "" {
-				req.Image = &image
-			}
 			if config != "" {
 				parsed, err := parseConfigInput(config)
 				if err != nil {
@@ -65,7 +61,6 @@ func newSetCommand() *cobra.Command {
 
 	cmd.Flags().StringVar(&tenantID, "tenant-id", "", "Tenant UUID")
 	cmd.Flags().StringVar(&tenantName, "tenant-name", "", "Tenant name")
-	cmd.Flags().StringVar(&image, "image", "", "Container image")
 	cmd.Flags().StringVar(&config, "config", "", "Compute config JSON or path to JSON file")
 	cmd.Flags().BoolVar(&usePatch, "patch", false, "Use PATCH instead of PUT")
 

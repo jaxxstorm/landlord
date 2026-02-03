@@ -62,11 +62,6 @@ func (s *Server) handleCreateTenant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Image == "" {
-		s.writeErrorResponse(w, http.StatusBadRequest, "image is required", nil, requestID)
-		return
-	}
-
 	// Validate compute configuration if provided
 	if req.ComputeConfig != nil {
 		if s.computeProvider == nil {

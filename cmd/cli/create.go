@@ -11,7 +11,6 @@ import (
 
 func newCreateCommand() *cobra.Command {
 	var tenantName string
-	var image string
 	var config string
 
 	cmd := &cobra.Command{
@@ -21,14 +20,10 @@ func newCreateCommand() *cobra.Command {
 			if tenantName == "" {
 				return fmt.Errorf("tenant-name is required")
 			}
-			if image == "" {
-				return fmt.Errorf("image is required")
-			}
 
 			client := cliapi.NewClient(cfg.APIURL)
 			req := models.CreateTenantRequest{
 				Name:  tenantName,
-				Image: image,
 			}
 			if config != "" {
 				parsed, err := parseConfigInput(config)
@@ -49,7 +44,6 @@ func newCreateCommand() *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&tenantName, "tenant-name", "", "Tenant name")
-	cmd.Flags().StringVar(&image, "image", "", "Container image")
 	cmd.Flags().StringVar(&config, "config", "", "Compute config JSON or path to JSON file")
 
 	return cmd

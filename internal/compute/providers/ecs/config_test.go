@@ -1,0 +1,58 @@
+package ecs
+
+import (
+	"encoding/json"
+	"testing"
+)
+
+func TestValidateConfigRequiresFields(t *testing.T) {
+	p := New(nil, nil)
+
+	if err := p.ValidateConfig(json.RawMessage(`{"task_definition_arn":"arn"}`)); err == nil {
+		t.Fatalf("expected error for missing cluster_arn")
+	}
+
+	if err := p.ValidateConfig(json.RawMessage(`{"cluster_arn":"arn"}`)); err == nil {
+		t.Fatalf("expected error for missing task_definition_arn")
+	}
+}
+
+func TestValidateConfigAcceptsValidConfig(t *testing.T) {
+	p := New(nil, nil)
+
+	cfg := json.RawMessage(`{
+		"cluster_arn":"arn:aws:ecs:us-west-2:123456789012:cluster/example",
+		"task_definition_arn":"arn:aws:ecs:us-west-2:123456789012:task-definition/example:1",
+		"desired_count": 1,
+		"launch_type": "FARGATE"
+	}`)
+
+	if err := p.ValidateConfig(cfg); err != nil {
+		t.Fatalf("expected config to be valid: %v", err)
+	}
+}
+
+func TestConfigSchemaIncludesRequiredFields(t *testing.T) {
+	p := New(nil, nil)
+
+	var schema map[string]interface{}
+	if err := json.Unmarshal(p.ConfigSchema(), &schema); err != nil {
+		t.Fatalf("expected schema to be valid JSON: %v", err)
+	}
+
+	required, ok := schema["required"].([]interface{})
+	if !ok {
+		t.Fatalf("expected required to be an array")
+	}
+
+	seen := map[string]bool{}
+	for _, item := range required {
+		if value, ok := item.(string); ok {
+			seen[value] = true
+		}
+	}
+
+	if !seen["cluster_arn"] || !seen["task_definition_arn"] {
+		t.Fatalf("expected required fields to include cluster_arn and task_definition_arn")
+	}
+}

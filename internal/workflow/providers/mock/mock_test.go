@@ -228,8 +228,7 @@ func TestProvider_Invoke(t *testing.T) {
 		TenantID:      "tenant-123",
 		TenantUUID:    "uuid-123",
 		Operation:     "provision",
-		DesiredImage:  "nginx:latest",
-		DesiredConfig: map[string]interface{}{"replicas": "1"},
+		DesiredConfig: map[string]interface{}{"image": "nginx:latest", "replicas": "1"},
 	}
 
 	result, err := p.Invoke(ctx, "provision", request)
@@ -266,8 +265,7 @@ func TestProvider_GetWorkflowStatus(t *testing.T) {
 		TenantID:      "tenant-abc",
 		TenantUUID:    "uuid-abc",
 		Operation:     "provision",
-		DesiredImage:  "nginx:latest",
-		DesiredConfig: map[string]interface{}{"replicas": "1"},
+		DesiredConfig: map[string]interface{}{"image": "nginx:latest", "replicas": "1"},
 	}
 
 	result, err := p.Invoke(ctx, "provision", request)

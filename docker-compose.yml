@@ -61,14 +61,14 @@ services:
     container_name: landlord-api
     user: "0"
     environment:
-      LANDLORD_CONFIG: /etc/landlord/test.config.yaml
+      LANDLORD_CONFIG: /etc/landlord/docker.config.yaml
       DOCKER_HOST: unix:///var/run/docker.sock
       LOG_LEVEL: debug
     ports:
       - "8081:8080"
     volumes:
       # Mount test configuration
-      - ./test.config.yaml:/etc/landlord/test.config.yaml:ro
+      - ./docker.config.yaml:/etc/landlord/docker.config.yaml:ro
       
       # Mount Docker socket for in-container Docker access
       # This allows Landlord to provision containers on the host
@@ -96,13 +96,13 @@ services:
     container_name: landlord-worker
     user: "0"
     environment:
-      LANDLORD_CONFIG: /etc/landlord/test.config.yaml
+      LANDLORD_CONFIG: /etc/landlord/docker.config.yaml
       DOCKER_HOST: unix:///var/run/docker.sock
       LOG_LEVEL: debug
       PORT: "9080"
     volumes:
       # Mount test configuration
-      - ./test.config.yaml:/etc/landlord/test.config.yaml:ro
+      - ./docker.config.yaml:/etc/landlord/docker.config.yaml:ro
       
       # Mount Docker socket for in-container Docker access
       - /var/run/docker.sock:/var/run/docker.sock:rw

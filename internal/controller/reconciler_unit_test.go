@@ -271,12 +271,20 @@ func (s *stubWorkflowClient) TriggerWorkflow(ctx context.Context, t *tenant.Tena
 	return "exec-stub", nil
 }
 
+func (s *stubWorkflowClient) TriggerWorkflowWithSource(ctx context.Context, t *tenant.Tenant, action, source string) (string, error) {
+	return "exec-stub", nil
+}
+
 func (s *stubWorkflowClient) GetExecutionStatus(ctx context.Context, executionID string) (*workflow.ExecutionStatus, error) {
 	return s.execStatus, nil
 }
 
 func (s *stubWorkflowClient) DetermineAction(status tenant.Status) (string, error) {
 	return "provision", nil
+}
+
+func (s *stubWorkflowClient) StopExecution(ctx context.Context, t *tenant.Tenant, executionID string, reason string) error {
+	return nil
 }
 
 func TestReconciler_UpdatesWorkflowSubStateOnActiveExecution(t *testing.T) {

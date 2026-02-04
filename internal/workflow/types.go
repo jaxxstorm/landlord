@@ -31,6 +31,7 @@ type ExecutionInput struct {
 	ExecutionName string            `json:"execution_name,omitempty"`
 	Input         json.RawMessage   `json:"input"`
 	Tags          map[string]string `json:"tags,omitempty"`
+	Metadata      map[string]string `json:"metadata,omitempty"` // Metadata like config_hash for change detection
 	TriggerSource string            `json:"trigger_source,omitempty"` // "api" or "controller"
 }
 

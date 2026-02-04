@@ -38,9 +38,9 @@ const createTenantQuery = `
 INSERT INTO tenants (
     id, name, status, status_message,
     desired_config,
-    labels, annotations
+    labels, annotations, workflow_config_hash
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7
+    $1, $2, $3, $4, $5, $6, $7, $8
 )
 RETURNING created_at, updated_at, version
 `
@@ -64,6 +64,7 @@ func (r *Repository) CreateTenant(ctx context.Context, t *tenant.Tenant) error {
 		jsonbOrEmptyInterfaceMap(t.DesiredConfig),
 		jsonbOrEmptyStringMap(t.Labels),
 		jsonbOrEmptyStringMap(t.Annotations),
+		t.WorkflowConfigHash,
 	)
 
 	err := row.Scan(&t.CreatedAt, &t.UpdatedAt, &t.Version)
@@ -88,7 +89,8 @@ SELECT
     observed_config, observed_resource_ids,
     created_at, updated_at,
 	version, labels, annotations, workflow_execution_id,
-	workflow_sub_state, workflow_retry_count, workflow_error_message
+	workflow_sub_state, workflow_retry_count, workflow_error_message,
+	workflow_config_hash
 FROM tenants
 WHERE name = $1
 `
@@ -116,6 +118,7 @@ func (r *Repository) GetTenantByName(ctx context.Context, name string) (*tenant.
 		&t.WorkflowSubState,
 		&t.WorkflowRetryCount,
 		&t.WorkflowErrorMessage,
+		&t.WorkflowConfigHash,
 	)
 
 	if err != nil {
@@ -152,7 +155,8 @@ SELECT
     observed_config, observed_resource_ids,
     created_at, updated_at,
 	version, labels, annotations, workflow_execution_id,
-	workflow_sub_state, workflow_retry_count, workflow_error_message
+	workflow_sub_state, workflow_retry_count, workflow_error_message,
+	workflow_config_hash
 FROM tenants
 WHERE id = $1
 `
@@ -180,6 +184,7 @@ func (r *Repository) GetTenantByID(ctx context.Context, id uuid.UUID) (*tenant.T
 		&t.WorkflowSubState,
 		&t.WorkflowRetryCount,
 		&t.WorkflowErrorMessage,
+		&t.WorkflowConfigHash,
 	)
 
 	if err != nil {
@@ -224,7 +229,8 @@ UPDATE tenants SET
 	workflow_execution_id = $10,
 	workflow_sub_state = $11,
 	workflow_retry_count = $12,
-	workflow_error_message = $13
+	workflow_error_message = $13,
+	workflow_config_hash = $15
 WHERE id = $1 AND version = $14
 RETURNING version, updated_at
 `
@@ -249,6 +255,7 @@ func (r *Repository) UpdateTenant(ctx context.Context, t *tenant.Tenant) error {
 		t.WorkflowRetryCount,
 		t.WorkflowErrorMessage,
 		t.Version, // Optimistic locking check
+		t.WorkflowConfigHash,
 	)
 
 	err := row.Scan(&t.Version, &t.UpdatedAt)
@@ -301,6 +308,7 @@ func (r *Repository) ListTenants(ctx context.Context, filters tenant.ListFilters
 			&t.WorkflowSubState,
 			&t.WorkflowRetryCount,
 			&t.WorkflowErrorMessage,
+			&t.WorkflowConfigHash,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("scan tenant: %w", err)
@@ -340,7 +348,8 @@ SELECT
     observed_config, observed_resource_ids,
     created_at, updated_at,
 	version, labels, annotations, workflow_execution_id,
-	workflow_sub_state, workflow_retry_count, workflow_error_message
+	workflow_sub_state, workflow_retry_count, workflow_error_message,
+	workflow_config_hash
 FROM tenants
 WHERE status IN ('requested', 'planning', 'provisioning', 'updating', 'deleting', 'archiving')
 ORDER BY created_at ASC
@@ -370,6 +379,7 @@ func (r *Repository) ListTenantsForReconciliation(ctx context.Context) ([]*tenan
 			&t.WorkflowSubState,
 			&t.WorkflowRetryCount,
 			&t.WorkflowErrorMessage,
+			&t.WorkflowConfigHash,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("scan tenant: %w", err)
@@ -411,7 +421,8 @@ func (r *Repository) buildListQuery(filters tenant.ListFilters) (string, []inter
             observed_config, observed_resource_ids,
             created_at, updated_at,
 			version, labels, annotations, workflow_execution_id,
-			workflow_sub_state, workflow_retry_count, workflow_error_message
+			workflow_sub_state, workflow_retry_count, workflow_error_message,
+	workflow_config_hash
         FROM tenants
         WHERE 1=1
     `

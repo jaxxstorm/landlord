@@ -52,6 +52,7 @@ type WorkflowClient interface {
 	TriggerWorkflowWithSource(ctx context.Context, t *tenant.Tenant, action, triggerSource string) (string, error)
 	DetermineAction(status tenant.Status) (string, error)
 	GetExecutionStatus(ctx context.Context, executionID string) (*workflow.ExecutionStatus, error)
+	StopExecution(ctx context.Context, t *tenant.Tenant, executionID string, reason string) error
 }
 
 // New creates a new HTTP API server

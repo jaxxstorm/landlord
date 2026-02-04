@@ -300,6 +300,173 @@ netstat -tuln | grep 8080  # Check if port in use
    # Kill existing process or change port
    ```
 
+### Issue: Workflow Not Restarting After Config Update
+
+**Symptoms:**
+- Updated tenant configuration via API (e.g., `PUT /tenants/{id}` or `cli set --tenant-name X --config ...`)
+- Workflow remains in backing-off or retrying state
+- Expected: workflow should restart with new config
+- Actual: workflow continues with old config
+
+**Root Cause:**
+- Config change detection requires `workflow_config_hash` field in tenant record
+- Old tenants (created before config hash feature) don't have stored hash
+- Workflow not in degraded state (backing-off/retrying) eligible for restart
+- Config change may not have actually changed the relevant fields
+
+**How Config Change Restart Works:**
+
+The controller automatically restarts degraded workflows when configuration changes:
+
+1. **Detection**: When reconciling a tenant with an in-flight workflow:
+   - Controller compares current config hash with stored `workflow_config_hash`
+   - If hashes differ AND workflow is in degraded state → restart triggered
+
+2. **Degraded States** (eligible for restart):
+   - `SubStateBackingOff`: Workflow backing off due to failures
+   - These workflows are stuck due to config errors, restart may fix them
+
+3. **Healthy States** (NOT restarted on config change):
+   - `SubStateRunning`: Actively provisioning, shouldn't interrupt
+   - `SubStateSucceeded`: Completed successfully
+   - `SubStateFailed`: Terminal failure, handled separately
+   - `SubStateWaiting`: Waiting for external event
+
+4. **Restart Flow**:
+   ```
+   Config Change Detected
+   ↓
+   Workflow in degraded state?
+   ↓ (yes)
+   Call provider.StopExecution("Configuration updated")
+   ↓
+   Poll until workflow reaches terminal state (30s timeout)
+   ↓
+   Clear execution_id, error_message, retry_count
+   ↓
+   Trigger new workflow with updated config
+   ↓
+   Store new config_hash
+   ```
+
+**Diagnosis:**
+
+1. Check if config hash is stored:
+```bash
+# Query tenant record
+curl http://localhost:8080/tenants/{tenant_id} | jq '.workflow_config_hash'
+
+# If null, tenant created before feature was added
+```
+
+2. Check workflow sub-state:
+```bash
+# Look at workflow_sub_state field
+curl http://localhost:8080/tenants/{tenant_id} | jq '.workflow_sub_state'
+
+# Should be "backing-off" or "retrying" for restart to trigger
+```
+
+3. Check controller logs for config change detection:
+```bash
+grep "config changed while workflow degraded" landlord.log
+grep "restarting workflow" landlord.log
+```
+
+4. Verify config actually changed:
+```bash
+# Compare current config hash
+echo '{"your":"config"}' | sha256sum
+
+# vs stored hash in tenant.workflow_config_hash
+```
+
+**Solutions:**
+
+1. **Old Tenant Without Config Hash**
+   - Manually stop and restart workflow:
+     ```bash
+     # Stop workflow via provider (e.g., docker stop, aws stepfunctions stop-execution)
+     # Controller will detect stopped state and trigger new workflow on next reconciliation
+     ```
+   - Or update to a newer status to trigger new workflow:
+     ```bash
+     # Archive then recreate tenant
+     cli archive --tenant-name X
+     cli create --tenant-name X --config new-config.yaml
+     ```
+
+2. **Workflow Not in Degraded State**
+   - If workflow is healthy (running), wait for completion before updating config
+   - If workflow is failed (terminal), update will trigger new workflow on next status change
+   - If backing off, verify config change was saved:
+     ```bash
+     curl http://localhost:8080/tenants/{tenant_id} | jq '.desired_config'
+     ```
+
+3. **Config Change Not Detected**
+   - Verify controller is reconciling tenant:
+     ```bash
+     grep "reconciling tenant.*{tenant_id}" landlord.log | tail -5
+     ```
+   - Check reconciliation interval: `CONTROLLER_RECONCILIATION_INTERVAL` (default 30s)
+   - Verify workflow execution ID exists:
+     ```bash
+     curl http://localhost:8080/tenants/{tenant_id} | jq '.workflow_execution_id'
+     ```
+
+4. **Stop Execution Timeout**
+   - Check logs for timeout errors:
+     ```bash
+     grep "timeout waiting for workflow to stop" landlord.log
+     ```
+   - Workflow provider may be slow to stop execution
+   - Increase stop polling timeout in code (default 30s)
+   - Verify provider's StopExecution API is working:
+     ```bash
+     # For Docker:
+     docker stop <container-id>  # Should complete in < 10s
+     
+     # For AWS Step Functions:
+     aws stepfunctions stop-execution --execution-arn <arn>
+     ```
+
+**Observability:**
+
+Monitor these log messages for config change restart behavior:
+
+```
+# Config change detected
+INFO config changed while workflow degraded, restarting workflow
+  tenant_id=<uuid>
+  execution_id=<id>
+  old_config_hash=<hash>
+  new_config_hash=<hash>
+
+# Workflow stop initiated
+INFO stopping workflow execution
+  tenant_id=<uuid>
+  execution_id=<id>
+
+# Workflow reached terminal state
+INFO workflow reached terminal state
+  execution_id=<id>
+  state=cancelled
+
+# New workflow triggered
+INFO new workflow triggered after config change
+  tenant_id=<uuid>
+  new_execution_id=<id>
+  action=provision
+```
+
+**Known Limitations:**
+
+- Config hash not retroactively added to old tenants (backward compatibility)
+- Only degraded workflows are restarted (by design, to preserve in-flight work)
+- Stop polling has 30-second timeout (tunable in code)
+- Hash computation includes entire DesiredConfig (no selective field hashing)
+
 ## Monitoring and Prevention
 
 ### Recommended Alerts

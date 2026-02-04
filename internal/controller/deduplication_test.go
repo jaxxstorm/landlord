@@ -74,6 +74,7 @@ type mockWorkflowClientForController struct {
 	triggerWithSourceFunc func(ctx context.Context, t *tenant.Tenant, action, source string) (string, error)
 	determineActionFunc   func(status tenant.Status) (string, error)
 	getStatusFunc         func(ctx context.Context, executionID string) (*workflow.ExecutionStatus, error)
+	stopExecutionFunc     func(ctx context.Context, t *tenant.Tenant, executionID string, reason string) error
 }
 
 func (m *mockWorkflowClientForController) TriggerWorkflow(ctx context.Context, t *tenant.Tenant, action string) (string, error) {
@@ -103,6 +104,13 @@ func (m *mockWorkflowClientForController) GetExecutionStatus(ctx context.Context
 		ExecutionID: executionID,
 		State:       workflow.StateRunning,
 	}, nil
+}
+
+func (m *mockWorkflowClientForController) StopExecution(ctx context.Context, t *tenant.Tenant, executionID string, reason string) error {
+	if m.stopExecutionFunc != nil {
+		return m.stopExecutionFunc(ctx, t, executionID, reason)
+	}
+	return nil
 }
 
 // TestControllerSkipsActiveWorkflow tests controller skips tenant with active workflow
@@ -213,8 +221,9 @@ func TestControllerUpdatesAfterCompletion(t *testing.T) {
 	if updatedStatus != tenant.StatusReady {
 		t.Errorf("expected status ready after completion, got %s", updatedStatus)
 	}
-	if updatedExecutionID == nil || *updatedExecutionID != "exec-completed-123" {
-		t.Errorf("expected workflow execution ID to be preserved, got %v", updatedExecutionID)
+	// After workflow completion, execution ID is cleared
+	if updatedExecutionID != nil {
+		t.Errorf("expected workflow execution ID to be cleared after completion, got %v", updatedExecutionID)
 	}
 }
 

@@ -63,6 +63,14 @@ func (wc *WorkflowClient) TriggerWorkflowWithSource(ctx context.Context, t *tena
 		zap.String("status", string(t.Status)),
 		zap.String("trigger_source", triggerSource))
 
+	// Compute config hash for change detection
+	configHash, err := tenant.ComputeConfigHash(t.DesiredConfig)
+	if err != nil {
+		wc.logger.Warn("failed to compute config hash, continuing without it",
+			zap.String("tenant_name", t.Name),
+			zap.Error(err))
+	}
+
 	// Determine workflow ID based on action
 	workflowID := fmt.Sprintf("tenant-%s-%s", t.ID.String(), action)
 	if wc.providerType == "restate" {
@@ -74,6 +82,12 @@ func (wc *WorkflowClient) TriggerWorkflowWithSource(ctx context.Context, t *tena
 		TenantUUID:    t.ID.String(),
 		Operation:     action,
 		DesiredConfig: t.DesiredConfig,
+		Metadata:      make(map[string]string),
+	}
+	
+	// Add config hash to metadata if computed successfully
+	if configHash != "" {
+		request.Metadata["config_hash"] = configHash
 	}
 	if provider, ok := t.DesiredConfig["compute_provider"]; ok {
 		if value, ok := provider.(string); ok {
@@ -232,4 +246,44 @@ func (wc *WorkflowClient) GetComputeExecutionStatus(ctx context.Context, executi
 	return wc.computeClient.GetComputeExecutionStatus(ctx, &workflow.GetExecutionStatusInput{
 		ExecutionID: executionID,
 	})
+}
+
+// StopExecution stops a running workflow execution
+func (wc *WorkflowClient) StopExecution(ctx context.Context, t *tenant.Tenant, executionID string, reason string) error {
+	if wc.manager == nil {
+		return fmt.Errorf("workflow manager not initialized")
+	}
+
+	// Create context with timeout
+	ctx, cancel := context.WithTimeout(ctx, wc.timeout)
+	defer cancel()
+
+	// Get provider from the tenant's workflow configuration
+	providerType := wc.providerType
+	provider, err := wc.manager.GetProvider(providerType)
+	if err != nil {
+		wc.logger.Error("failed to get workflow provider",
+			zap.String("provider_type", providerType),
+			zap.Error(err))
+		return fmt.Errorf("failed to get workflow provider: %w", err)
+	}
+
+	// Stop the execution
+	wc.logger.Info("stopping workflow execution",
+		zap.String("execution_id", executionID),
+		zap.String("reason", reason),
+		zap.String("tenant_id", t.ID.String()))
+
+	err = provider.StopExecution(ctx, executionID, reason)
+	if err != nil {
+		wc.logger.Error("failed to stop workflow execution",
+			zap.String("execution_id", executionID),
+			zap.Error(err))
+		return fmt.Errorf("failed to stop workflow execution: %w", err)
+	}
+
+	wc.logger.Info("workflow execution stopped successfully",
+		zap.String("execution_id", executionID))
+
+	return nil
 }

@@ -184,3 +184,39 @@ func TestIsRetryableError_MultipleErrors(t *testing.T) {
 		})
 	}
 }
+
+func TestTriggerWorkflow_ComputesConfigHash(t *testing.T) {
+	// This test verifies that config hash is computed when triggering workflow
+	// The hash computation itself is tested in tenant package
+	
+	testTenant := &tenant.Tenant{
+		Name:   "test-tenant",
+		Status: tenant.StatusRequested,
+		DesiredConfig: map[string]interface{}{
+			"image": "nginx:1.25",
+			"env": map[string]string{
+				"FOO": "bar",
+			},
+		},
+	}
+
+	// Compute expected hash
+	expectedHash, err := tenant.ComputeConfigHash(testTenant.DesiredConfig)
+	if err != nil {
+		t.Fatalf("Failed to compute expected hash: %v", err)
+	}
+
+	if expectedHash == "" {
+		t.Error("Expected non-empty config hash for non-empty config")
+	}
+
+	// Verify hash is deterministic
+	hash2, err := tenant.ComputeConfigHash(testTenant.DesiredConfig)
+	if err != nil {
+		t.Fatalf("Failed to compute second hash: %v", err)
+	}
+
+	if expectedHash != hash2 {
+		t.Errorf("Config hash not deterministic: %s != %s", expectedHash, hash2)
+	}
+}

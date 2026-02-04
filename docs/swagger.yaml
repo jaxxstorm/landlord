@@ -354,7 +354,15 @@ paths:
     put:
       consumes:
       - application/json
-      description: Updates properties of an existing tenant
+      description: |-
+        Updates properties of an existing tenant. Changes to the `desired_config` field will trigger automatic workflow restart if the workflow is in a degraded state (backing-off). 
+        
+        **Config Change Behavior:**
+        - If workflow is backing-off due to config errors, updating config will stop the degraded workflow and start a new one with the updated configuration
+        - If workflow is running successfully, config changes will NOT interrupt it (changes take effect on next workflow trigger)
+        - Config hash is computed and stored for change detection
+        
+        The update is asynchronous - the API returns immediately after validation, and the controller handles workflow restart in the background (typically within 30 seconds based on reconciliation interval).
       parameters:
       - description: Tenant identifier (UUID or name)
         in: path

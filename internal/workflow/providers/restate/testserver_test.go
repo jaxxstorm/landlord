@@ -85,6 +85,9 @@ func (f *fakeRestateServer) handle(w http.ResponseWriter, r *http.Request) {
 	case strings.HasPrefix(r.URL.Path, "/invocations/") && r.Method == http.MethodGet:
 		f.handleInvocationStatus(w, r)
 		return
+	case strings.HasPrefix(r.URL.Path, "/invocations/") && strings.HasSuffix(r.URL.Path, "/kill") && r.Method == http.MethodPatch:
+		f.handleKillInvocation(w, r)
+		return
 	case r.Method == http.MethodPost && r.URL.Path == "/services":
 		f.handleRegister(w, r)
 		return
@@ -168,6 +171,11 @@ func (f *fakeRestateServer) handleInvocationStatus(w http.ResponseWriter, r *htt
 	_ = json.NewEncoder(w).Encode(map[string]interface{}{
 		"status": "completed",
 	})
+}
+
+func (f *fakeRestateServer) handleKillInvocation(w http.ResponseWriter, r *http.Request) {
+	// Accept kill requests with 202 Accepted
+	w.WriteHeader(http.StatusAccepted)
 }
 
 func (f *fakeRestateServer) handleQuery(w http.ResponseWriter, r *http.Request) {

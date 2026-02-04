@@ -133,6 +133,10 @@ type Tenant struct {
 	// Used to track and monitor workflow progress
 	WorkflowExecutionID *string `json:"workflow_execution_id,omitempty"`
 
+	// WorkflowConfigHash stores SHA256 hash of DesiredConfig when workflow starts
+	// Used to detect config changes and trigger workflow restart for degraded workflows
+	WorkflowConfigHash *string `json:"workflow_config_hash,omitempty"`
+
 	// WorkflowSubState provides provider-agnostic execution sub-state (running, backing-off, error)
 	WorkflowSubState *string `json:"workflow_sub_state,omitempty"`
 

@@ -53,6 +53,7 @@ type ProvisionRequest struct {
 	DesiredConfig   map[string]interface{} `json:"desired_config,omitempty"`
 	ComputeProvider string                 `json:"compute_provider,omitempty"`
 	APIBaseURL      string                 `json:"api_base_url,omitempty"`
+	Metadata        map[string]string      `json:"metadata,omitempty"` // Metadata like config_hash
 }
 
 // WorkflowStatus is a simplified execution status response

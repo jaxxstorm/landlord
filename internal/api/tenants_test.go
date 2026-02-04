@@ -58,6 +58,10 @@ func (m *mockWorkflowClient) GetExecutionStatus(ctx context.Context, executionID
 	}, nil
 }
 
+func (m *mockWorkflowClient) StopExecution(ctx context.Context, t *tenant.Tenant, executionID string, reason string) error {
+	return nil
+}
+
 // mockTenantRepo implements tenant.Repository for testing
 type mockTenantRepo struct {
 	createFunc           func(ctx context.Context, t *tenant.Tenant) error

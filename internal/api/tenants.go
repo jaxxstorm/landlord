@@ -675,6 +675,27 @@ func (s *Server) handleDeleteTenant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// If there's an active workflow, stop it before transitioning to archiving
+	if t.WorkflowExecutionID != nil && *t.WorkflowExecutionID != "" {
+		executionID := *t.WorkflowExecutionID
+		s.logger.Info("stopping workflow before deletion",
+			zap.String("tenant_id", t.ID.String()),
+			zap.String("tenant_name", t.Name),
+			zap.String("execution_id", executionID),
+			zap.String("request_id", requestID),
+		)
+
+		// Stop the workflow (will use kill for backing-off workflows)
+		if err := s.workflowClient.StopExecution(ctx, t, executionID, "Tenant deletion requested"); err != nil {
+			s.logger.Warn("failed to stop workflow during deletion",
+				zap.Error(err),
+				zap.String("execution_id", executionID),
+				zap.String("request_id", requestID),
+			)
+			// Continue with deletion even if workflow stop fails
+		}
+	}
+
 	// Set status to deleting
 	t.Status = tenant.StatusArchiving
 	t.StatusMessage = "Archival requested"

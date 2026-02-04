@@ -18,8 +18,10 @@ import (
 // workflowClientInterface defines methods used by reconciler
 type workflowClientInterface interface {
 	TriggerWorkflow(ctx context.Context, t *tenant.Tenant, action string) (string, error)
+	TriggerWorkflowWithSource(ctx context.Context, t *tenant.Tenant, action, source string) (string, error)
 	GetExecutionStatus(ctx context.Context, executionID string) (*workflow.ExecutionStatus, error)
 	DetermineAction(status tenant.Status) (string, error)
+	StopExecution(ctx context.Context, t *tenant.Tenant, executionID string, reason string) error
 }
 
 // Reconciler manages tenant reconciliation
@@ -149,7 +151,7 @@ func (r *Reconciler) pollStatusLoop() {
 			r.logger.Info("status poll loop stopped")
 			return
 		case <-ticker.C:
-			r.pollTenantsByStatus([]tenant.Status{tenant.StatusProvisioning, tenant.StatusUpdating, tenant.StatusDeleting, tenant.StatusArchiving})
+			r.pollTenantsByStatus([]tenant.Status{tenant.StatusProvisioning, tenant.StatusUpdating, tenant.StatusDeleting, tenant.StatusArchiving, tenant.StatusFailed})
 		}
 	}
 }
@@ -259,6 +261,32 @@ func (r *Reconciler) reconcile(tenantID string) error {
 				zap.String("state", string(execStatus.State)),
 				zap.Any("metadata", execStatus.Metadata))
 			
+			// Check for config change + degraded workflow -> restart
+			if isDegradedWorkflow(execStatus) && hasConfigChanged(t) {
+				oldHash := ""
+				if t.WorkflowConfigHash != nil {
+					oldHash = *t.WorkflowConfigHash
+				}
+				currentHash, _ := tenant.ComputeConfigHash(t.DesiredConfig)
+				
+				r.logger.Info("config changed while workflow degraded, restarting workflow",
+					zap.String("tenant_id", tenantID),
+					zap.String("tenant_name", t.Name),
+					zap.String("execution_id", *t.WorkflowExecutionID),
+					zap.String("old_config_hash", oldHash),
+					zap.String("new_config_hash", currentHash))
+				
+				// Stop the degraded workflow
+				if err := r.stopAndRestartWorkflow(ctx, t); err != nil {
+					r.logger.Error("failed to stop and restart workflow",
+						zap.String("tenant_id", tenantID),
+						zap.Error(err))
+					return err
+				}
+				
+				return nil
+			}
+			
 			if execStatus.State == workflow.StatePending || execStatus.State == workflow.StateRunning {
 				subState, retryCount, errMsg := workflow.ExtractWorkflowDetails(execStatus)
 				
@@ -306,10 +334,51 @@ func (r *Reconciler) reconcile(tenantID string) error {
 				return nil
 			}
 
-			if err := r.handleWorkflowFailure(ctx, t, execStatus); err != nil {
-				return err
+			// Handle workflow failure - but check for config change first
+			if execStatus.State == workflow.StateFailed || execStatus.State == workflow.StateTimedOut {
+				// Check if config changed since workflow failed -> trigger new workflow with updated config
+				if hasConfigChanged(t) {
+					oldHash := ""
+					if t.WorkflowConfigHash != nil {
+						oldHash = *t.WorkflowConfigHash
+					}
+					currentHash, _ := tenant.ComputeConfigHash(t.DesiredConfig)
+					
+					r.logger.Info("config changed for failed workflow, triggering new workflow",
+						zap.String("tenant_id", tenantID),
+						zap.String("tenant_name", t.Name),
+						zap.String("execution_id", *t.WorkflowExecutionID),
+						zap.String("old_config_hash", oldHash),
+						zap.String("new_config_hash", currentHash))
+					
+					// Clear execution ID and move back to requested to trigger new workflow
+					t.WorkflowExecutionID = nil
+					t.WorkflowSubState = nil
+					t.WorkflowRetryCount = nil
+					t.WorkflowErrorMessage = nil
+					t.Status = tenant.StatusRequested
+					t.StatusMessage = "Config changed, retrying with updated configuration"
+					
+					if err := r.tenantRepo.UpdateTenant(ctx, t); err != nil {
+						return fmt.Errorf("failed to reset failed tenant for config change: %w", err)
+					}
+					
+					// Continue to trigger new workflow below (fall through to normal trigger logic)
+					r.logger.Info("failed workflow reset for config change, will trigger new workflow")
+				} else {
+					// No config change, handle failure normally
+					if err := r.handleWorkflowFailure(ctx, t, execStatus); err != nil {
+						return err
+					}
+					return nil
+				}
+			} else {
+				// Other terminal states (cancelled, etc.) - handle as failure
+				if err := r.handleWorkflowFailure(ctx, t, execStatus); err != nil {
+					return err
+				}
+				return nil
 			}
-			return nil
 		}
 	}
 
@@ -338,6 +407,16 @@ func (r *Reconciler) reconcile(tenantID string) error {
 	}
 	t.StatusMessage = fmt.Sprintf("Workflow execution started: %s", executionID)
 	t.WorkflowExecutionID = &executionID
+
+	// Compute and store config hash for change detection
+	configHash, err := tenant.ComputeConfigHash(t.DesiredConfig)
+	if err != nil {
+		r.logger.Warn("failed to compute config hash",
+			zap.String("tenant_id", tenantID),
+			zap.Error(err))
+	} else if configHash != "" {
+		t.WorkflowConfigHash = &configHash
+	}
 
 	running := string(workflow.SubStateRunning)
 	zero := 0
@@ -566,6 +645,122 @@ func logWorkflowStatusChange(logger *zap.Logger, t *tenant.Tenant, subState work
 	}
 
 	logger.Info("workflow status updated", fields...)
+}
+
+// stopAndRestartWorkflow stops the current degraded workflow and triggers a new one
+func (r *Reconciler) stopAndRestartWorkflow(ctx context.Context, t *tenant.Tenant) error {
+	if t.WorkflowExecutionID == nil || *t.WorkflowExecutionID == "" {
+		return fmt.Errorf("no workflow execution ID to stop")
+	}
+
+	executionID := *t.WorkflowExecutionID
+	r.logger.Info("stopping workflow execution",
+		zap.String("tenant_id", t.ID.String()),
+		zap.String("execution_id", executionID))
+
+	// Stop the workflow
+	if err := r.workflowClient.StopExecution(ctx, t, executionID, "Configuration updated"); err != nil {
+		return fmt.Errorf("failed to stop workflow execution: %w", err)
+	}
+
+	r.logger.Info("workflow execution stopped, polling for completion",
+		zap.String("tenant_id", t.ID.String()),
+		zap.String("execution_id", executionID))
+
+	// Poll until stopped (with timeout)
+	timeout := time.After(30 * time.Second)
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-timeout:
+			return fmt.Errorf("timeout waiting for workflow to stop")
+		case <-ticker.C:
+			status, err := r.workflowClient.GetExecutionStatus(ctx, executionID)
+			if err != nil {
+				r.logger.Warn("error polling stopped workflow status",
+					zap.String("execution_id", executionID),
+					zap.Error(err))
+				continue
+			}
+
+			// Check if workflow reached terminal state
+			if status.State == workflow.StateFailed ||
+				status.State == workflow.StateTimedOut ||
+				status.State == workflow.StateCancelled ||
+				status.State == workflow.StateSucceeded {
+				r.logger.Info("workflow reached terminal state",
+					zap.String("execution_id", executionID),
+					zap.String("state", string(status.State)))
+				goto stopped
+			}
+		}
+	}
+
+stopped:
+	// Reload tenant to get latest version
+	reloadedTenant, err := r.tenantRepo.GetTenantByID(ctx, t.ID)
+	if err != nil {
+		return fmt.Errorf("failed to reload tenant: %w", err)
+	}
+
+	// Clear old execution ID and error state
+	reloadedTenant.WorkflowExecutionID = nil
+	reloadedTenant.WorkflowErrorMessage = nil
+	retryCount := 0
+	reloadedTenant.WorkflowRetryCount = &retryCount
+
+	// Update tenant to clear execution ID
+	if err := r.tenantRepo.UpdateTenant(ctx, reloadedTenant); err != nil {
+		return fmt.Errorf("failed to update tenant after stopping workflow: %w", err)
+	}
+
+	r.logger.Info("cleared workflow execution ID, triggering new workflow",
+		zap.String("tenant_id", reloadedTenant.ID.String()))
+
+	// Determine action and trigger new workflow
+	action, err := r.workflowClient.DetermineAction(reloadedTenant.Status)
+	if err != nil {
+		return fmt.Errorf("failed to determine action for new workflow: %w", err)
+	}
+
+	// Trigger new workflow with config-change source to differentiate from normal triggers
+	newExecutionID, err := r.workflowClient.TriggerWorkflowWithSource(ctx, reloadedTenant, action, "controller:config-change")
+	if err != nil {
+		return fmt.Errorf("failed to trigger new workflow: %w", err)
+	}
+
+	// Reload tenant again to get latest version after trigger
+	reloadedTenant, err = r.tenantRepo.GetTenantByID(ctx, reloadedTenant.ID)
+	if err != nil {
+		return fmt.Errorf("failed to reload tenant after trigger: %w", err)
+	}
+
+	// Update tenant with new execution ID and config hash
+	reloadedTenant.WorkflowExecutionID = &newExecutionID
+	configHash, err := tenant.ComputeConfigHash(reloadedTenant.DesiredConfig)
+	if err != nil {
+		r.logger.Warn("failed to compute config hash for new workflow",
+			zap.String("tenant_id", reloadedTenant.ID.String()),
+			zap.Error(err))
+	} else {
+		reloadedTenant.WorkflowConfigHash = &configHash
+	}
+
+	if err := r.tenantRepo.UpdateTenant(ctx, reloadedTenant); err != nil {
+		return fmt.Errorf("failed to update tenant with new workflow execution: %w", err)
+	}
+
+	r.logger.Info("new workflow triggered after config change",
+		zap.String("tenant_id", reloadedTenant.ID.String()),
+		zap.String("new_execution_id", newExecutionID),
+		zap.String("action", action))
+
+	// Update the original tenant pointer so caller has latest state
+	*t = *reloadedTenant
+
+	return nil
 }
 
 func stringPtrEqual(a *string, b *string) bool {

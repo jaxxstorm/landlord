@@ -92,6 +92,7 @@ func (p *Provider) Invoke(ctx context.Context, workflowID string, request *workf
 			"tenant_uuid": request.TenantUUID,
 			"operation":   operation,
 		},
+		Metadata:      request.Metadata, // Pass through metadata (e.g., config_hash)
 		TriggerSource: "reconciler",
 	}
 

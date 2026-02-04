@@ -34,6 +34,7 @@ func mapInvocationSubState(status string) workflow.WorkflowSubState {
 }
 
 // extractInvocationMetadata pulls retry/backoff metadata from Restate responses.
+// Also extracts user-provided metadata like config_hash from the original input.
 func extractInvocationMetadata(payload map[string]interface{}) map[string]string {
 	if len(payload) == 0 {
 		return nil
@@ -42,6 +43,19 @@ func extractInvocationMetadata(payload map[string]interface{}) map[string]string
 
 	if status, ok := payload["status"].(string); ok {
 		metadata["restate_status"] = status
+	}
+
+	// Extract user-provided metadata (e.g., config_hash) from original input if available
+	if input, ok := payload["input"].(map[string]interface{}); ok {
+		if metadataMap, ok := input["metadata"].(map[string]interface{}); ok {
+			for key, value := range metadataMap {
+				if strValue, ok := value.(string); ok {
+					metadata[key] = strValue
+				} else {
+					metadata[key] = fmt.Sprintf("%v", value)
+				}
+			}
+		}
 	}
 
 	for _, key := range []string{"retry_count", "retryCount", "retry_attempts", "retryAttempts", "attempts"} {

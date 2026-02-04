@@ -128,6 +128,62 @@ Workflow workers are stateless HTTP handlers invoked by the workflow provider; t
 
 Only tenants in **non-terminal** states (not ready, not archived, not failed) are included in reconciliation polling.
 
+### Config Change Restart Behavior
+
+When a tenant's configuration changes while a workflow is in-flight, the reconciler applies declarative semantics to ensure the workflow uses the latest config:
+
+**Restart Conditions** (all must be true):
+1. Tenant has an active workflow execution (`workflow_execution_id` != null)
+2. Workflow is in **degraded state** (`workflow_sub_state` = "backing-off")
+3. Configuration has changed (current config hash ≠ stored `workflow_config_hash`)
+
+**Degraded States** (eligible for restart):
+- `backing-off`: Workflow backing off due to failures, likely caused by config errors
+
+**Healthy States** (NOT restarted):
+- `running`: Actively provisioning, restart would lose progress
+- `succeeded`: Completed successfully, no restart needed
+- `failed`: Terminal state, handled separately
+- `waiting`: Waiting for external event, not an error condition
+
+**Restart Flow:**
+```
+Config Change Detected (hash comparison)
+         ↓
+Is workflow degraded? (backing-off)
+         ↓ YES
+Stop workflow execution (reason: "Configuration updated")
+         ↓
+Poll until terminal state (30s timeout)
+         ↓
+Clear execution_id, error_message, retry_count
+         ↓
+Trigger new workflow with updated config
+         ↓
+Store new config_hash in tenant record
+         ↓
+Continue normal reconciliation
+```
+
+**Example Scenario:**
+1. Tenant created with invalid Docker image → workflow provisions → fails → backs off
+2. User updates tenant config with correct image via API: `PUT /tenants/{id}`
+3. Reconciler detects config change during next status poll (30s interval)
+4. Reconciler stops backing-off workflow
+5. Reconciler triggers new workflow with corrected image
+6. New workflow succeeds → tenant transitions to `ready`
+
+**Observability:**
+- Log message: `"config changed while workflow degraded, restarting workflow"`
+- Includes: `tenant_id`, `old_config_hash`, `new_config_hash`, `execution_id`
+- Followed by: `"stopping workflow execution"`, `"new workflow triggered after config change"`
+
+**Notes:**
+- Config hash not retroactively added to old tenants (backward compatibility)
+- Only JSON-serializable fields in `desired_config` are hashed
+- Hash computation is deterministic (same config → same hash)
+- Stop polling has 30-second timeout to prevent infinite wait
+
 ## Metrics
 
 The state machine integrates with observability systems:

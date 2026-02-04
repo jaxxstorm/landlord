@@ -531,7 +531,34 @@ func (c *Client) CancelExecution(ctx context.Context, executionID string) error 
 		return fmt.Errorf("execution ID is required")
 	}
 
-	c.logger.Debug("execution cancelled",
+	c.logger.Debug("killing execution",
+		zap.String("execution_id", executionID),
+	)
+
+	// Call Restate Admin API to kill the invocation
+	// Using /kill instead of /cancel for immediate termination without waiting for workflow to resume
+	url := fmt.Sprintf("%s/invocations/%s/kill", c.adminEndpoint, executionID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPatch, url, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create kill request: %w", err)
+	}
+
+	if err := c.addAuthHeader(req); err != nil {
+		return fmt.Errorf("failed to add auth header: %w", err)
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to kill execution: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusAccepted && resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("unexpected status code %d killing execution: %s", resp.StatusCode, string(body))
+	}
+
+	c.logger.Debug("execution killed successfully",
 		zap.String("execution_id", executionID),
 	)
 

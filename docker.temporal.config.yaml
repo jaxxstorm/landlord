@@ -1,6 +1,4 @@
-# Docker Compose Test Configuration
-# Minimal configuration for local development and testing via docker-compose
-# This file is mounted inside the Landlord container in docker-compose.yml
+# Docker Compose configuration for Temporal local testing
 
 database:
   provider: postgres
@@ -37,22 +35,13 @@ compute:
     label_prefix: landlord
 
 workflow:
-  default_provider: restate
-  restate:
-    endpoint: http://restate:8080
-    admin_endpoint: http://restate:9070
-    worker_advertised_url: http://worker:9080/
-    service_name: TenantProvisioning
-    execution_mechanism: local
-    auth_type: none
+  default_provider: temporal
+  temporal:
+    host_port: temporal:7233
+    namespace: default
+    task_queue: landlord
     timeout: 30m
     retry_attempts: 3
-  # temporal:
-  #   host_port: temporal:7233
-  #   namespace: default
-  #   task_queue: landlord
-  #   timeout: 30m
-  #   retry_attempts: 3
 
 controller:
   enabled: true
@@ -62,4 +51,4 @@ controller:
   workflow_trigger_timeout: 30s
   shutdown_timeout: 30s
   max_retries: 5
-  workflow_provider: restate
+  workflow_provider: temporal

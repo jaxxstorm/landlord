@@ -37,6 +37,11 @@ func NewViperInstance() *viper.Viper {
 	v.SetDefault("workflow.step_functions.region", "us-west-2")
 	v.SetDefault("workflow.restate.worker_register_on_startup", true)
 	v.SetDefault("workflow.restate.worker_compute_cache_ttl", "5m")
+	v.SetDefault("workflow.temporal.host_port", "localhost:7233")
+	v.SetDefault("workflow.temporal.namespace", "default")
+	v.SetDefault("workflow.temporal.task_queue", "landlord")
+	v.SetDefault("workflow.temporal.timeout", "30m")
+	v.SetDefault("workflow.temporal.retry_attempts", 3)
 
 	return v
 }
@@ -166,6 +171,21 @@ func BindEnvironmentVariables(v *viper.Viper) error {
 	}
 	if err := v.BindEnv("workflow.restate.worker_advertised_url", "WORKFLOW_RESTATE_WORKER_ADVERTISED_URL"); err != nil {
 		return fmt.Errorf("failed to bind WORKFLOW_RESTATE_WORKER_ADVERTISED_URL: %w", err)
+	}
+	if err := v.BindEnv("workflow.temporal.host_port", "WORKFLOW_TEMPORAL_HOST_PORT"); err != nil {
+		return fmt.Errorf("failed to bind WORKFLOW_TEMPORAL_HOST_PORT: %w", err)
+	}
+	if err := v.BindEnv("workflow.temporal.namespace", "WORKFLOW_TEMPORAL_NAMESPACE"); err != nil {
+		return fmt.Errorf("failed to bind WORKFLOW_TEMPORAL_NAMESPACE: %w", err)
+	}
+	if err := v.BindEnv("workflow.temporal.task_queue", "WORKFLOW_TEMPORAL_TASK_QUEUE"); err != nil {
+		return fmt.Errorf("failed to bind WORKFLOW_TEMPORAL_TASK_QUEUE: %w", err)
+	}
+	if err := v.BindEnv("workflow.temporal.timeout", "WORKFLOW_TEMPORAL_TIMEOUT"); err != nil {
+		return fmt.Errorf("failed to bind WORKFLOW_TEMPORAL_TIMEOUT: %w", err)
+	}
+	if err := v.BindEnv("workflow.temporal.retry_attempts", "WORKFLOW_TEMPORAL_RETRY_ATTEMPTS"); err != nil {
+		return fmt.Errorf("failed to bind WORKFLOW_TEMPORAL_RETRY_ATTEMPTS: %w", err)
 	}
 
 	return nil

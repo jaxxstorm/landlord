@@ -73,7 +73,7 @@ func (wc *WorkflowClient) TriggerWorkflowWithSource(ctx context.Context, t *tena
 
 	// Determine workflow ID based on action
 	workflowID := fmt.Sprintf("tenant-%s-%s", t.ID.String(), action)
-	if wc.providerType == "restate" {
+	if wc.providerType == "restate" || wc.providerType == "temporal" {
 		workflowID = "tenant-provisioning"
 	}
 

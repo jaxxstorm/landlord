@@ -1,5 +1,6 @@
 - [Overview](README.md)
 - [Quickstart](quickstart.md)
+- [Temporal Local Development](temporal-local-development.md)
 
 - Components
   - [Compute Providers](compute-providers.md)

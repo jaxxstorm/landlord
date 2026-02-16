@@ -156,6 +156,98 @@ func TestRestateWorkerConfigValidation(t *testing.T) {
 	}
 }
 
+func TestTemporalConfigValidation(t *testing.T) {
+	tests := []struct {
+		name      string
+		cfg       config.TemporalConfig
+		shouldErr bool
+		errMsg    string
+	}{
+		{
+			name: "valid temporal config",
+			cfg: config.TemporalConfig{
+				HostPort:      "localhost:7233",
+				Namespace:     "default",
+				TaskQueue:     "landlord",
+				Timeout:       30 * time.Minute,
+				RetryAttempts: 3,
+			},
+			shouldErr: false,
+		},
+		{
+			name: "missing host_port",
+			cfg: config.TemporalConfig{
+				Namespace:     "default",
+				TaskQueue:     "landlord",
+				Timeout:       30 * time.Minute,
+				RetryAttempts: 3,
+			},
+			shouldErr: true,
+			errMsg:    "host_port is required",
+		},
+		{
+			name: "missing namespace",
+			cfg: config.TemporalConfig{
+				HostPort:      "localhost:7233",
+				TaskQueue:     "landlord",
+				Timeout:       30 * time.Minute,
+				RetryAttempts: 3,
+			},
+			shouldErr: true,
+			errMsg:    "namespace is required",
+		},
+		{
+			name: "missing task queue",
+			cfg: config.TemporalConfig{
+				HostPort:      "localhost:7233",
+				Namespace:     "default",
+				Timeout:       30 * time.Minute,
+				RetryAttempts: 3,
+			},
+			shouldErr: true,
+			errMsg:    "task_queue is required",
+		},
+		{
+			name: "non-positive timeout",
+			cfg: config.TemporalConfig{
+				HostPort:      "localhost:7233",
+				Namespace:     "default",
+				TaskQueue:     "landlord",
+				Timeout:       0,
+				RetryAttempts: 3,
+			},
+			shouldErr: true,
+			errMsg:    "timeout must be positive",
+		},
+		{
+			name: "negative retry attempts",
+			cfg: config.TemporalConfig{
+				HostPort:      "localhost:7233",
+				Namespace:     "default",
+				TaskQueue:     "landlord",
+				Timeout:       30 * time.Minute,
+				RetryAttempts: -1,
+			},
+			shouldErr: true,
+			errMsg:    "retry_attempts must be non-negative",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.cfg.Validate()
+			if tt.shouldErr {
+				assert.Error(t, err)
+				if tt.errMsg != "" {
+					assert.Contains(t, err.Error(), tt.errMsg)
+				}
+				return
+			}
+			assert.NoError(t, err)
+		})
+	}
+}
+
 // TestEndpointURLValidation tests URL format validation
 func TestEndpointURLValidation(t *testing.T) {
 	tests := []struct {
@@ -349,6 +441,12 @@ func TestWorkflowConfigValidation(t *testing.T) {
 			shouldErr:       true, // Restate endpoint empty
 		},
 		{
+			name:            "default provider temporal with valid config",
+			defaultProvider: "temporal",
+			restateCfg:      config.RestateConfig{},
+			shouldErr:       false,
+		},
+		{
 			name:            "invalid default provider",
 			defaultProvider: "invalid-provider",
 			restateCfg:      config.RestateConfig{},
@@ -361,6 +459,13 @@ func TestWorkflowConfigValidation(t *testing.T) {
 			cfg := config.WorkflowConfig{
 				DefaultProvider: tt.defaultProvider,
 				Restate:         tt.restateCfg,
+				Temporal: config.TemporalConfig{
+					HostPort:      "localhost:7233",
+					Namespace:     "default",
+					TaskQueue:     "landlord",
+					Timeout:       30 * time.Minute,
+					RetryAttempts: 3,
+				},
 			}
 			err := cfg.Validate()
 			if tt.shouldErr {

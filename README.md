@@ -76,3 +76,5 @@ make build
 ```
 
 See `docs/quickstart.md` for a complete local setup.
+
+For Temporal-specific local workflow testing, see `docs/temporal-local-development.md`.

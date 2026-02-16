@@ -19,6 +19,7 @@ import (
 	"github.com/jaxxstorm/landlord/internal/tenant/postgres"
 	"github.com/jaxxstorm/landlord/internal/workflow"
 	"github.com/jaxxstorm/landlord/internal/workflow/providers/restate"
+	"github.com/jaxxstorm/landlord/internal/workflow/providers/temporal"
 	"go.uber.org/zap"
 )
 
@@ -146,6 +147,14 @@ func main() {
 		log.Fatal("Failed to register restate worker engine", zap.Error(err))
 	}
 
+	temporalWorker, err := temporal.NewWorkerEngine(cfg.Workflow.Temporal, computeRegistry, computeResolver, log)
+	if err != nil {
+		log.Fatal("Failed to initialize temporal worker engine", zap.Error(err))
+	}
+	if err := workerRegistry.Register(temporalWorker); err != nil {
+		log.Fatal("Failed to register temporal worker engine", zap.Error(err))
+	}
+
 	workerEngine, err := workerRegistry.Get(cfg.Workflow.DefaultProvider)
 	if err != nil {
 		log.Fatal("Failed to select worker engine", zap.Error(err))
@@ -173,6 +182,9 @@ func main() {
 }
 
 func getWorkerAddress() string {
+	if addr := os.Getenv("LANDLORD_WORKER_ADDRESS"); addr != "" {
+		return addr
+	}
 	if addr := os.Getenv("LANDLORD_RESTATE_WORKER_ADDRESS"); addr != "" {
 		return addr
 	}

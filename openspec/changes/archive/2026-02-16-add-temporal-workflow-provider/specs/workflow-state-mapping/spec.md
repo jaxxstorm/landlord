@@ -1,10 +1,4 @@
-# Specification: Workflow State Mapping
-
-## Purpose
-
-Define provider-agnostic workflow sub-state nomenclature and mapping rules from workflow provider-specific states to Landlord canonical states.
-
-## ADDED Requirements
+## MODIFIED Requirements
 
 ### Requirement: Canonical workflow sub-states are provider-agnostic
 The system SHALL define canonical workflow sub-states that abstract provider-specific execution states.
@@ -92,15 +86,3 @@ The system SHALL determine backing-off sub-state by analyzing workflow execution
 - **THEN** the system SHALL use "running" as default sub-state
 - **AND** retry count SHALL be 0
 
-### Requirement: State mapping is documented in provider interface
-The workflow provider interface specification SHALL document the mapping from provider-specific states to canonical sub-states.
-
-#### Scenario: Provider interface includes state mapping table
-- **WHEN** implementing a new workflow provider
-- **THEN** the provider documentation SHALL include a state mapping table
-- **AND** the table shows provider states and their canonical equivalents
-
-#### Scenario: State mapping is testable
-- **WHEN** testing workflow provider implementations
-- **THEN** tests SHALL verify correct mapping of all provider states
-- **AND** tests SHALL verify handling of unknown states

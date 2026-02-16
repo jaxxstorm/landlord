@@ -37,9 +37,9 @@ type ControllerConfig struct {
 func (c *ControllerConfig) Validate() error {
 	if c.Enabled {
 		if c.WorkflowProvider != "" {
-			validProviders := map[string]bool{"mock": true, "step-functions": true, "restate": true}
+			validProviders := map[string]bool{"mock": true, "step-functions": true, "restate": true, "temporal": true}
 			if !validProviders[c.WorkflowProvider] {
-				return fmt.Errorf("workflow_provider must be mock, step-functions, or restate")
+				return fmt.Errorf("workflow_provider must be mock, step-functions, restate, or temporal")
 			}
 		}
 		if c.ReconciliationInterval <= 0 {

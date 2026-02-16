@@ -73,40 +73,38 @@ context: |
     - Prefer interfaces and dependency injection to keep ports/adapters testable
 
 rules:
+  proposal:
+    - Each proposal must include a clear motivation or problem statement.
+    - Each proposal must define proposed behavior in normative terms.
+    - Each proposal must describe idempotency and retry semantics.
+    - Each proposal must describe failure modes and recovery or compensation expectations.
+    - Each proposal must include observability and audit requirements.
+    - Each proposal must include a test plan summary that prioritizes unit tests.
+
   specs:
     - Specs are the source of truth; code must follow specs.
     - Use clear MUST/SHOULD/MAY language for requirements.
-    - Every spec change should explicitly state impact on:
-      - API behavior
-      - state model / transitions
-      - persistence schema (if applicable)
-      - workflow semantics (retries, compensation, idempotency)
-      - compute semantics (containers, secrets, config)
-    - Avoid defining final lifecycle state names unless required by the change;
-      prefer describing allowed transitions and invariants.
-
-  changes:
-    - Each change must include:
-      - Motivation / problem statement
-      - Proposed behavior (normative)
-      - Idempotency + retry semantics
-      - Failure modes and recovery/compensation expectations
-      - Observability/audit requirements (events/logs/state transitions)
-      - Test plan (unit tests first)
-
-  api:
+    - Every spec change should explicitly state impact on API behavior.
+    - Every spec change should explicitly state impact on state model and transitions.
+    - Every spec change should explicitly state impact on persistence schema, if applicable.
+    - Every spec change should explicitly state impact on workflow semantics such as retries, compensation, and idempotency.
+    - Every spec change should explicitly state impact on compute semantics such as containers, secrets, and config.
+    - Avoid defining final lifecycle state names unless required by the change; prefer describing allowed transitions and invariants.
     - APIs should support end-to-end status tracking for tenant creation and updates.
-    - Read APIs must expose current status plus history/audit trail.
+    - Read APIs must expose current status plus history and audit trail.
     - All mutating operations must be idempotent.
-
-  workflows:
     - Workflow engines must tolerate retries and partial failures.
-    - Workflows should be safe to resume/replay without duplicating side effects.
-    - Define explicit step boundaries and validation/wait points where needed.
+    - Workflows should be safe to resume or replay without duplicating side effects.
+    - Define explicit workflow step boundaries and validation or wait points where needed.
+    - Persistence must record tenant desired state revisions.
+    - Persistence must record observed state snapshots or references.
+    - Persistence must record state transitions with timestamps and actor metadata.
+    - Persistence must record audit history sufficient for debugging and compliance.
 
-  persistence:
-    - Persistence must record:
-      - tenant desired state revisions
-      - observed state snapshots (or references)
-      - state transitions with timestamps and actor metadata
-      - audit history sufficient for debugging and compliance
+  design:
+    - Design docs should explain architecture choices and key tradeoffs.
+    - Design docs should identify affected components, dependencies, and migration concerns.
+
+  tasks:
+    - Tasks should be implementation-focused, testable, and ordered for execution.
+    - Tasks should include verification work covering unit and integration tests.

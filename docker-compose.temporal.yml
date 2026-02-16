@@ -1,0 +1,146 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: landlord-postgres-temporal
+    environment:
+      POSTGRES_USER: landlord
+      POSTGRES_PASSWORD: landlord_password
+      POSTGRES_DB: landlord_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - landlord_postgres_data:/var/lib/postgresql/data
+      - ./scripts/postgres-init.sql:/docker-entrypoint-initdb.d/01-init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U landlord -d landlord_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - landlord-network
+
+  temporal:
+    image: temporalio/auto-setup:1.27.2
+    container_name: landlord-temporal
+    environment:
+      DB: postgres12
+      DB_PORT: 5432
+      POSTGRES_SEEDS: temporal-postgres
+      POSTGRES_USER: temporal
+      POSTGRES_PWD: temporal
+      DBNAME: temporal
+      VISIBILITY_DBNAME: temporal_visibility
+    ports:
+      - "7233:7233"
+    depends_on:
+      temporal-postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 7233 || nc -z $(hostname -i) 7233"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+    networks:
+      - landlord-network
+
+  temporal-postgres:
+    image: postgres:15-alpine
+    container_name: landlord-temporal-postgres
+    environment:
+      POSTGRES_USER: temporal
+      POSTGRES_PASSWORD: temporal
+      POSTGRES_DB: temporal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U temporal -d temporal"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - landlord-network
+
+  temporal-ui:
+    image: temporalio/ui:2.39.0
+    container_name: landlord-temporal-ui
+    environment:
+      TEMPORAL_ADDRESS: temporal:7233
+      TEMPORAL_UI_PORT: 8080
+    ports:
+      - "8233:8080"
+    depends_on:
+      temporal:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080 >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - landlord-network
+
+  landlord:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    container_name: landlord-api-temporal
+    user: "0"
+    environment:
+      LANDLORD_CONFIG: /etc/landlord/docker.temporal.config.yaml
+      DOCKER_HOST: unix:///var/run/docker.sock
+      LOG_LEVEL: debug
+    ports:
+      - "8081:8080"
+    volumes:
+      - ./docker.temporal.config.yaml:/etc/landlord/docker.temporal.config.yaml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:rw
+    depends_on:
+      postgres:
+        condition: service_healthy
+      temporal:
+        condition: service_healthy
+    networks:
+      - landlord-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  worker-temporal:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+      target: runtime
+      args:
+        WORKER_CMD: ./cmd/workers/temporal
+    container_name: landlord-worker-temporal
+    user: "0"
+    environment:
+      LANDLORD_CONFIG: /etc/landlord/docker.temporal.config.yaml
+      DOCKER_HOST: unix:///var/run/docker.sock
+      LOG_LEVEL: debug
+      LANDLORD_WORKER_ADDRESS: ":9081"
+      PORT: "9081"
+    volumes:
+      - ./docker.temporal.config.yaml:/etc/landlord/docker.temporal.config.yaml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:rw
+    depends_on:
+      postgres:
+        condition: service_healthy
+      temporal:
+        condition: service_healthy
+    networks:
+      - landlord-network
+
+volumes:
+  landlord_postgres_data:
+    driver: local
+
+networks:
+  landlord-network:
+    driver: bridge

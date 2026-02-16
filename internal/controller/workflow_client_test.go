@@ -6,9 +6,80 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
+	"github.com/jaxxstorm/landlord/internal/compute"
+	"github.com/jaxxstorm/landlord/internal/workflow"
 	"github.com/jaxxstorm/landlord/internal/tenant"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 )
+
+type captureWorkflowProvider struct {
+	name             string
+	invokedWorkflow  string
+	lastProvisionReq *workflow.ProvisionRequest
+}
+
+func (p *captureWorkflowProvider) Name() string { return p.name }
+
+func (p *captureWorkflowProvider) Invoke(ctx context.Context, workflowID string, request *workflow.ProvisionRequest) (*workflow.ExecutionResult, error) {
+	_ = ctx
+	p.invokedWorkflow = workflowID
+	p.lastProvisionReq = request
+	return &workflow.ExecutionResult{
+		ExecutionID:  "exec-1",
+		WorkflowID:   workflowID,
+		ProviderType: p.name,
+		State:        workflow.StateRunning,
+		StartedAt:    time.Now(),
+	}, nil
+}
+
+func (p *captureWorkflowProvider) GetWorkflowStatus(ctx context.Context, executionID string) (*workflow.WorkflowStatus, error) {
+	_ = ctx
+	_ = executionID
+	return &workflow.WorkflowStatus{ExecutionID: executionID, State: workflow.StateRunning}, nil
+}
+func (p *captureWorkflowProvider) CreateWorkflow(ctx context.Context, spec *workflow.WorkflowSpec) (*workflow.CreateWorkflowResult, error) {
+	_ = ctx
+	return &workflow.CreateWorkflowResult{
+		WorkflowID:   spec.WorkflowID,
+		ProviderType: p.name,
+		CreatedAt:    time.Now(),
+	}, nil
+}
+func (p *captureWorkflowProvider) StartExecution(ctx context.Context, workflowID string, input *workflow.ExecutionInput) (*workflow.ExecutionResult, error) {
+	_ = ctx
+	_ = input
+	return &workflow.ExecutionResult{ExecutionID: "exec-1", WorkflowID: workflowID, ProviderType: p.name, State: workflow.StateRunning, StartedAt: time.Now()}, nil
+}
+func (p *captureWorkflowProvider) GetExecutionStatus(ctx context.Context, executionID string) (*workflow.ExecutionStatus, error) {
+	_ = ctx
+	return &workflow.ExecutionStatus{ExecutionID: executionID, ProviderType: p.name, State: workflow.StateRunning, StartTime: time.Now()}, nil
+}
+func (p *captureWorkflowProvider) StopExecution(ctx context.Context, executionID string, reason string) error {
+	_ = ctx
+	_ = executionID
+	_ = reason
+	return nil
+}
+func (p *captureWorkflowProvider) DeleteWorkflow(ctx context.Context, workflowID string) error {
+	_ = ctx
+	_ = workflowID
+	return nil
+}
+func (p *captureWorkflowProvider) Validate(ctx context.Context, spec *workflow.WorkflowSpec) error {
+	_ = ctx
+	_ = spec
+	return nil
+}
+func (p *captureWorkflowProvider) PostComputeCallback(ctx context.Context, executionID string, payload *compute.CallbackPayload, opts *compute.CallbackOptions) error {
+	_ = ctx
+	_ = executionID
+	_ = payload
+	_ = opts
+	return nil
+}
 
 func newTestWorkflowClient() *WorkflowClient {
 	logger, _ := zap.NewDevelopment()
@@ -220,3 +291,52 @@ func TestTriggerWorkflow_ComputesConfigHash(t *testing.T) {
 		t.Errorf("Config hash not deterministic: %s != %s", expectedHash, hash2)
 	}
 }
+
+func TestTriggerWorkflow_UsesStaticWorkflowIDForTemporal(t *testing.T) {
+	logger, _ := zap.NewDevelopment()
+	provider := &captureWorkflowProvider{name: "temporal"}
+	registry := workflow.NewRegistry(logger)
+	require.NoError(t, registry.Register(provider))
+
+	manager := workflow.New(registry, logger)
+	wc := NewWorkflowClient(manager, logger, 5*time.Second, "temporal")
+
+	testTenant := &tenant.Tenant{
+		ID:     uuid.New(),
+		Name:   "temporal-app",
+		Status: tenant.StatusRequested,
+		DesiredConfig: map[string]interface{}{
+			"image": "nginx:latest",
+		},
+	}
+
+	_, err := wc.TriggerWorkflow(context.Background(), testTenant, "provision")
+	require.NoError(t, err)
+	require.Equal(t, tenantProvisioningWorkflowID, provider.invokedWorkflow)
+}
+
+func TestTriggerWorkflow_UsesPerTenantWorkflowIDForNonTemporalProviders(t *testing.T) {
+	logger, _ := zap.NewDevelopment()
+	provider := &captureWorkflowProvider{name: "mock"}
+	registry := workflow.NewRegistry(logger)
+	require.NoError(t, registry.Register(provider))
+
+	manager := workflow.New(registry, logger)
+	wc := NewWorkflowClient(manager, logger, 5*time.Second, "mock")
+
+	tenantID := uuid.New()
+	testTenant := &tenant.Tenant{
+		ID:     tenantID,
+		Name:   "mock-app",
+		Status: tenant.StatusRequested,
+		DesiredConfig: map[string]interface{}{
+			"image": "nginx:latest",
+		},
+	}
+
+	_, err := wc.TriggerWorkflow(context.Background(), testTenant, "provision")
+	require.NoError(t, err)
+	require.Equal(t, "tenant-"+tenantID.String()+"-provision", provider.invokedWorkflow)
+}
+
+const tenantProvisioningWorkflowID = "tenant-provisioning"

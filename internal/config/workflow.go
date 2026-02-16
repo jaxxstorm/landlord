@@ -11,6 +11,7 @@ type WorkflowConfig struct {
 	DefaultProvider string              `mapstructure:"default_provider" env:"WORKFLOW_DEFAULT_PROVIDER" default:"mock"`
 	StepFunctions   StepFunctionsConfig `mapstructure:"step_functions"`
 	Restate         RestateConfig       `mapstructure:"restate"`
+	Temporal        TemporalConfig      `mapstructure:"temporal"`
 }
 
 // StepFunctionsConfig holds AWS Step Functions provider configuration
@@ -40,12 +41,21 @@ type RestateConfig struct {
 	WorkerAdvertisedURL     string        `mapstructure:"worker_advertised_url" env:"WORKFLOW_RESTATE_WORKER_ADVERTISED_URL"`
 }
 
+// TemporalConfig holds Temporal workflow provider configuration.
+type TemporalConfig struct {
+	HostPort      string        `mapstructure:"host_port" env:"WORKFLOW_TEMPORAL_HOST_PORT" default:"localhost:7233"`
+	Namespace     string        `mapstructure:"namespace" env:"WORKFLOW_TEMPORAL_NAMESPACE" default:"default"`
+	TaskQueue     string        `mapstructure:"task_queue" env:"WORKFLOW_TEMPORAL_TASK_QUEUE" default:"landlord"`
+	Timeout       time.Duration `mapstructure:"timeout" env:"WORKFLOW_TEMPORAL_TIMEOUT" default:"30m"`
+	RetryAttempts int           `mapstructure:"retry_attempts" env:"WORKFLOW_TEMPORAL_RETRY_ATTEMPTS" default:"3"`
+}
+
 // Validate validates workflow configuration
 func (w *WorkflowConfig) Validate() error {
 	// Validate default provider value
-	validProviders := map[string]bool{"mock": true, "step-functions": true, "restate": true}
+	validProviders := map[string]bool{"mock": true, "step-functions": true, "restate": true, "temporal": true}
 	if !validProviders[w.DefaultProvider] {
-		return fmt.Errorf("invalid default_provider: %s (must be mock, step-functions, or restate)", w.DefaultProvider)
+		return fmt.Errorf("invalid default_provider: %s (must be mock, step-functions, restate, or temporal)", w.DefaultProvider)
 	}
 
 	// If Step Functions is the default provider, ensure RoleARN is configured
@@ -62,10 +72,24 @@ func (w *WorkflowConfig) Validate() error {
 		}
 	}
 
+	// If Temporal is the default provider, ensure configuration is valid
+	if w.DefaultProvider == "temporal" {
+		if err := w.Temporal.Validate(); err != nil {
+			return fmt.Errorf("temporal config: %w", err)
+		}
+	}
+
 	// Always validate Restate config if it's provided, even if not default
 	if w.Restate.Endpoint != "" {
 		if err := w.Restate.Validate(); err != nil {
 			return fmt.Errorf("restate config: %w", err)
+		}
+	}
+
+	// Always validate Temporal config if it's partially provided, even when not default.
+	if w.Temporal.HostPort != "" || w.Temporal.Namespace != "" || w.Temporal.TaskQueue != "" {
+		if err := w.Temporal.Validate(); err != nil {
+			return fmt.Errorf("temporal config: %w", err)
 		}
 	}
 
@@ -211,5 +235,25 @@ func validateAuthMechanism(mechanism, authType, apiKey string) error {
 		return nil
 	}
 
+	return nil
+}
+
+// Validate validates Temporal configuration.
+func (t *TemporalConfig) Validate() error {
+	if t.HostPort == "" {
+		return fmt.Errorf("host_port is required for Temporal provider")
+	}
+	if t.Namespace == "" {
+		return fmt.Errorf("namespace is required for Temporal provider")
+	}
+	if t.TaskQueue == "" {
+		return fmt.Errorf("task_queue is required for Temporal provider")
+	}
+	if t.Timeout <= 0 {
+		return fmt.Errorf("timeout must be positive")
+	}
+	if t.RetryAttempts < 0 {
+		return fmt.Errorf("retry_attempts must be non-negative")
+	}
 	return nil
 }

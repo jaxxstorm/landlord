@@ -40,3 +40,4 @@ The system SHALL allow worker engines to resolve compute engine selection from t
 - **WHEN** a worker job references a compute provider that is not registered
 - **THEN** the worker engine SHALL fail with a validation error that identifies the unknown provider
 - **AND** the failure SHALL be surfaced through workflow status and logs
+

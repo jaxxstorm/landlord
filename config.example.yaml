@@ -157,7 +157,7 @@ compute:
 # =============================================================================#
 
 workflow:
-  # Default workflow provider: mock, restate, step_functions
+  # Default workflow provider: mock, restate, step-functions, temporal
   # Used when creating workflows without explicit provider_type
   default_provider: mock
   
@@ -209,6 +209,25 @@ workflow:
   #   # REQUIRED if step_functions provider is used
   #   # Example: arn:aws:iam::123456789012:role/LandlordStepFunctionsRole
   #   role_arn: ""
+
+  # ============================================================================
+  # Temporal Workflow Provider Configuration
+  # ============================================================================
+  # Uncomment this section to enable Temporal provider
+  #
+  # temporal:
+  #   # Temporal frontend host:port
+  #   host_port: localhost:7233
+  #
+  #   # Temporal namespace
+  #   namespace: default
+  #
+  #   # Task queue name used by landlord workflows
+  #   task_queue: landlord
+  #
+  #   # Provider timeout and retry behavior
+  #   timeout: 30m
+  #   retry_attempts: 3
 
 ################################################################################
 # CONTROLLER CONFIGURATION

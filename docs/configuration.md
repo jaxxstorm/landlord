@@ -155,6 +155,8 @@ http:
   write_timeout: 10s
   idle_timeout: 120s
   shutdown_timeout: 30s
+  tailscale_auth:
+    enabled: false
 
 log:
   level: info
@@ -381,6 +383,65 @@ For more details on SQLite configuration, see [Database Provider: SQLite](./data
 | `HTTP_IDLE_TIMEOUT` | duration | `120s` | HTTP idle timeout |
 | `HTTP_SHUTDOWN_TIMEOUT` | duration | `30s` | Graceful shutdown timeout |
 
+#### Tailscale API Authorization
+
+Landlord can optionally expose its HTTP API through `tsnet` and enforce endpoint-level Tailscale capabilities. This is disabled by default.
+
+When `http.tailscale_auth.enabled` is `true`:
+
+- The API listener is created through `tsnet` instead of the normal TCP listener.
+- Only endpoints listed in `protected_endpoints` require Tailscale authorization.
+- Health and readiness endpoints remain unprotected unless you explicitly add them to the protected endpoint list.
+- Capability checks are performed against the caller's Tailscale identity using `lbrlabs.com/cap/landlord` or nested capability values under that prefix.
+
+Environment variables:
+
+| Variable | Type | Default | Description |
+|----------|------|---------|-------------|
+| `HTTP_TAILSCALE_AUTH_ENABLED` | bool | `false` | Enable Tailscale-backed API auth |
+| `HTTP_TAILSCALE_AUTH_HOSTNAME` | string | (empty) | Required tsnet hostname when auth is enabled |
+| `HTTP_TAILSCALE_AUTH_STATE_DIR` | string | (empty) | Optional tsnet state directory |
+| `HTTP_TAILSCALE_AUTH_AUTH_KEY` | string | (empty) | Optional Tailscale auth key for node registration |
+| `HTTP_TAILSCALE_AUTH_EPHEMERAL` | bool | `false` | Register the tsnet node as ephemeral |
+| `HTTP_TAILSCALE_AUTH_LISTEN_ADDR` | string | `:<http.port>` | Tailnet listener address in `:port` form |
+
+YAML example:
+
+```yaml
+http:
+  host: 0.0.0.0
+  port: 8080
+  tailscale_auth:
+    enabled: true
+    hostname: landlord-api
+    state_dir: /var/lib/landlord/tsnet
+    listen_addr: ":8080"
+    protected_endpoints:
+      - method: GET
+        path: /v1/tenants
+        capability: lbrlabs.com/cap/landlord/read
+      - method: POST
+        path: /v1/tenants
+        capability: lbrlabs.com/cap/landlord/write
+      - method: PUT
+        path: /v1/tenants/{id}
+        capability: lbrlabs.com/cap/landlord/write
+      - method: DELETE
+        path: /v1/tenants/{id}
+        capability: lbrlabs.com/cap/landlord/write
+```
+
+Validation rules:
+
+- `hostname` is required when Tailscale auth is enabled.
+- `listen_addr` must use `:port` form.
+- Each protected endpoint must declare a supported HTTP method and a path starting with `/`.
+- Each capability must be exactly `lbrlabs.com/cap/landlord` or a nested value such as `lbrlabs.com/cap/landlord/read`.
+
+Operational note:
+
+- If Tailscale identity lookup or capability evaluation fails for a protected endpoint, Landlord denies the request before any handler side effects occur.
+
 ### Logging Configuration
 
 | Variable | Type | Default | Description |
@@ -500,6 +561,23 @@ export HTTP_PORT=8080
 
 ./landlord
 ```
+
+### Example: Enabling Tailscale API Authorization via Environment
+
+```bash
+export DB_HOST=prod-db.example.com
+export DB_PORT=5432
+export DB_USER=landlord
+export DB_PASSWORD=secure_password_here
+export DB_DATABASE=landlord_prod
+export HTTP_TAILSCALE_AUTH_ENABLED=true
+export HTTP_TAILSCALE_AUTH_HOSTNAME=landlord-api
+export HTTP_TAILSCALE_AUTH_LISTEN_ADDR=:8080
+
+./landlord
+```
+
+Use a configuration file for `protected_endpoints`, since the endpoint rule list is easier to manage in YAML than in flat environment variables.
 
 ---
 

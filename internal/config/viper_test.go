@@ -316,6 +316,31 @@ func TestConfigNestedStructMarshaling(t *testing.T) {
 	assert.Equal(t, "arn:aws:iam::123456789:role/sfn", cfg.Workflow.StepFunctions.RoleARN)
 }
 
+func TestLoadFromViper_TailscaleAuthConfig(t *testing.T) {
+	v := NewViperInstance()
+	setComputeDefaults(v)
+	v.Set("database.user", "user")
+	v.Set("database.password", "pass")
+	v.Set("database.database", "db")
+	v.Set("http.tailscale_auth.enabled", true)
+	v.Set("http.tailscale_auth.hostname", "landlord-tailnet")
+	v.Set("http.tailscale_auth.protected_endpoints", []map[string]any{
+		{
+			"method":     "GET",
+			"path":       "/v1/docs",
+			"capability": TailscaleCapabilityPrefix,
+		},
+	})
+
+	cfg, err := LoadFromViper(v)
+	require.NoError(t, err)
+	require.Len(t, cfg.HTTP.TailscaleAuth.ProtectedEndpoints, 1)
+	assert.True(t, cfg.HTTP.TailscaleAuth.Enabled)
+	assert.Equal(t, "landlord-tailnet", cfg.HTTP.TailscaleAuth.Hostname)
+	assert.Equal(t, "/v1/docs", cfg.HTTP.TailscaleAuth.ProtectedEndpoints[0].Path)
+	assert.Equal(t, TailscaleCapabilityPrefix, cfg.HTTP.TailscaleAuth.ProtectedEndpoints[0].Capability)
+}
+
 func setComputeDefaults(v *viper.Viper) {
 	v.Set("compute.docker.image", "nginx:latest")
 	v.Set("compute.ecs.cluster_arn", "arn:aws:ecs:us-east-1:123456789012:cluster/test")

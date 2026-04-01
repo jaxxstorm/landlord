@@ -29,6 +29,8 @@ func NewViperInstance() *viper.Viper {
 	v.SetDefault("http.write_timeout", "10s")
 	v.SetDefault("http.idle_timeout", "120s")
 	v.SetDefault("http.shutdown_timeout", "30s")
+	v.SetDefault("http.tailscale_auth.enabled", false)
+	v.SetDefault("http.tailscale_auth.ephemeral", false)
 
 	v.SetDefault("log.level", "info")
 	v.SetDefault("log.format", "development")
@@ -104,6 +106,24 @@ func BindEnvironmentVariables(v *viper.Viper) error {
 	}
 	if err := v.BindEnv("http.shutdown_timeout", "HTTP_SHUTDOWN_TIMEOUT"); err != nil {
 		return fmt.Errorf("failed to bind HTTP_SHUTDOWN_TIMEOUT: %w", err)
+	}
+	if err := v.BindEnv("http.tailscale_auth.enabled", "HTTP_TAILSCALE_AUTH_ENABLED"); err != nil {
+		return fmt.Errorf("failed to bind HTTP_TAILSCALE_AUTH_ENABLED: %w", err)
+	}
+	if err := v.BindEnv("http.tailscale_auth.hostname", "HTTP_TAILSCALE_AUTH_HOSTNAME"); err != nil {
+		return fmt.Errorf("failed to bind HTTP_TAILSCALE_AUTH_HOSTNAME: %w", err)
+	}
+	if err := v.BindEnv("http.tailscale_auth.state_dir", "HTTP_TAILSCALE_AUTH_STATE_DIR"); err != nil {
+		return fmt.Errorf("failed to bind HTTP_TAILSCALE_AUTH_STATE_DIR: %w", err)
+	}
+	if err := v.BindEnv("http.tailscale_auth.auth_key", "HTTP_TAILSCALE_AUTH_AUTH_KEY"); err != nil {
+		return fmt.Errorf("failed to bind HTTP_TAILSCALE_AUTH_AUTH_KEY: %w", err)
+	}
+	if err := v.BindEnv("http.tailscale_auth.ephemeral", "HTTP_TAILSCALE_AUTH_EPHEMERAL"); err != nil {
+		return fmt.Errorf("failed to bind HTTP_TAILSCALE_AUTH_EPHEMERAL: %w", err)
+	}
+	if err := v.BindEnv("http.tailscale_auth.listen_addr", "HTTP_TAILSCALE_AUTH_LISTEN_ADDR"); err != nil {
+		return fmt.Errorf("failed to bind HTTP_TAILSCALE_AUTH_LISTEN_ADDR: %w", err)
 	}
 
 	// Logging configuration

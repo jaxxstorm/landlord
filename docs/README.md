@@ -16,6 +16,16 @@ Landlord follows a reconciliation model:
 
 Landlord uses path-based API versioning. The current stable version is `v1`, and all HTTP endpoints are served under `/v1`.
 
+## API access control
+
+Landlord can run without API authentication, or operators can opt into Tailscale-backed authorization for selected endpoints.
+
+- Default mode: the existing HTTP listener is used and no Tailscale capability checks run.
+- Tailscale auth mode: Landlord serves the API through `tsnet` and checks configured endpoint rules against Tailscale capabilities under `lbrlabs.com/cap/landlord`.
+- Protection is endpoint-specific, so health and readiness checks can remain open while tenant lifecycle endpoints require capabilities.
+
+For setup details, see `configuration.md`. For request behavior, see `api.md`.
+
 ## Components
 
 - **Compute**: Provisions runtime resources for tenants.
@@ -45,3 +55,4 @@ Landlord uses registries for compute, workflow, and database providers. Each com
 - Database types: `database.md`
 - Worker types: `workers.md`
 - API browser: `api.md`
+- Configuration reference: `configuration.md`

@@ -12,12 +12,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"go.uber.org/zap"
+	"tailscale.com/tsnet"
 
 	"github.com/jaxxstorm/landlord/internal/apiversion"
 	"github.com/jaxxstorm/landlord/internal/compute"
@@ -30,15 +32,19 @@ import (
 
 // Server represents the HTTP API server
 type Server struct {
-	router          *chi.Mux
-	server          *http.Server
-	provider        database.Provider
-	computeRegistry *compute.Registry
+	router                 *chi.Mux
+	server                 *http.Server
+	listener               net.Listener
+	provider               database.Provider
+	computeRegistry        *compute.Registry
 	defaultComputeProvider string
-	tenantRepo      tenant.Repository
-	controller      ControllerHealthChecker
-	workflowClient  WorkflowClient
-	logger          *zap.Logger
+	tenantRepo             tenant.Repository
+	controller             ControllerHealthChecker
+	workflowClient         WorkflowClient
+	logger                 *zap.Logger
+	httpConfig             *config.HTTPConfig
+	tailscaleAuthorizer    TailscaleAuthorizer
+	tsnetServer            *tsnet.Server
 }
 
 // ControllerHealthChecker defines the interface for checking controller health
@@ -66,18 +72,17 @@ func New(cfg *config.HTTPConfig, dbProvider database.Provider, computeRegistry *
 	r.Use(middleware.RealIP)
 	r.Use(logger.HTTPMiddleware(log))
 	r.Use(logger.CorrelationIDMiddleware)
-	r.Use(middleware.Recoverer)
-	r.Use(middleware.Timeout(60 * time.Second))
 
 	srv := &Server{
-		router:          r,
-		provider:        dbProvider,
-		computeRegistry: computeRegistry,
+		router:                 r,
+		provider:               dbProvider,
+		computeRegistry:        computeRegistry,
 		defaultComputeProvider: defaultComputeProvider,
-		tenantRepo:      tenantRepo,
-		controller:      nil, // Set later with SetController()
-		workflowClient:  workflowClient,
-		logger:          log,
+		tenantRepo:             tenantRepo,
+		controller:             nil, // Set later with SetController()
+		workflowClient:         workflowClient,
+		logger:                 log,
+		httpConfig:             cfg,
 		server: &http.Server{
 			Addr:         cfg.Address(),
 			Handler:      r,
@@ -86,6 +91,10 @@ func New(cfg *config.HTTPConfig, dbProvider database.Provider, computeRegistry *
 			IdleTimeout:  cfg.IdleTimeout,
 		},
 	}
+
+	r.Use(srv.tailscaleAuthMiddleware())
+	r.Use(middleware.Recoverer)
+	r.Use(middleware.Timeout(60 * time.Second))
 
 	// Register routes
 	srv.registerRoutes()
@@ -261,8 +270,12 @@ func (s *Server) handleDocsUI(w http.ResponseWriter, r *http.Request) {
 
 // Start starts the HTTP server
 func (s *Server) Start() error {
+	if err := s.configureListener(); err != nil {
+		return err
+	}
+
 	s.logger.Info("starting HTTP server", zap.String("address", s.server.Addr))
-	if err := s.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+	if err := s.server.Serve(s.listener); err != nil && err != http.ErrServerClosed {
 		return fmt.Errorf("server failed: %w", err)
 	}
 	return nil
@@ -275,6 +288,58 @@ func (s *Server) Shutdown(ctx context.Context) error {
 		s.logger.Error("server shutdown failed", zap.Error(err))
 		return fmt.Errorf("server shutdown failed: %w", err)
 	}
+	if s.tsnetServer != nil {
+		if err := s.tsnetServer.Close(); err != nil {
+			s.logger.Error("tsnet shutdown failed", zap.Error(err))
+			return fmt.Errorf("tsnet shutdown failed: %w", err)
+		}
+	}
 	s.logger.Info("HTTP server shut down successfully")
+	return nil
+}
+
+func (s *Server) configureListener() error {
+	if s.listener != nil {
+		return nil
+	}
+
+	if s.httpConfig != nil && s.httpConfig.TailscaleAuth.Enabled {
+		tsServer := &tsnet.Server{
+			Hostname:  s.httpConfig.TailscaleAuth.Hostname,
+			Dir:       s.httpConfig.TailscaleAuth.StateDir,
+			AuthKey:   s.httpConfig.TailscaleAuth.AuthKey,
+			Ephemeral: s.httpConfig.TailscaleAuth.Ephemeral,
+			UserLogf: func(format string, args ...interface{}) {
+				s.logger.Info(fmt.Sprintf(format, args...))
+			},
+			Logf: func(format string, args ...interface{}) {
+				s.logger.Debug(fmt.Sprintf(format, args...))
+			},
+		}
+
+		listener, err := tsServer.Listen("tcp", s.httpConfig.TailscaleAuth.ListenAddress(s.httpConfig.Port))
+		if err != nil {
+			return fmt.Errorf("failed to start tsnet listener: %w", err)
+		}
+
+		localClient, err := tsServer.LocalClient()
+		if err != nil {
+			listener.Close()
+			return fmt.Errorf("failed to create tsnet local client: %w", err)
+		}
+
+		s.listener = listener
+		s.tsnetServer = tsServer
+		s.tailscaleAuthorizer = newTailscaleCapabilityAuthorizer(localClient)
+		s.server.Addr = s.httpConfig.TailscaleAuth.ListenAddress(s.httpConfig.Port)
+		return nil
+	}
+
+	listener, err := net.Listen("tcp", s.server.Addr)
+	if err != nil {
+		return fmt.Errorf("failed to listen on %s: %w", s.server.Addr, err)
+	}
+
+	s.listener = listener
 	return nil
 }

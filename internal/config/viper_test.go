@@ -307,13 +307,16 @@ func TestConfigNestedStructMarshaling(t *testing.T) {
 
 	// Set nested values
 	v.Set("workflow.step_functions.region", "us-east-1")
-	v.Set("workflow.step_functions.role_arn", "arn:aws:iam::123456789:role/sfn")
+	v.Set("workflow.step_functions.state_machine_arn", "arn:aws:states:us-east-1:123456789:stateMachine:landlord")
+	v.Set("workflow.step_functions.caller_assume_role.role_arn", "arn:aws:iam::123456789:role/sfn-caller")
 
 	cfg, err := LoadFromViper(v)
 	require.NoError(t, err)
 
 	assert.Equal(t, "us-east-1", cfg.Workflow.StepFunctions.Region)
-	assert.Equal(t, "arn:aws:iam::123456789:role/sfn", cfg.Workflow.StepFunctions.RoleARN)
+	assert.Equal(t, "arn:aws:states:us-east-1:123456789:stateMachine:landlord", cfg.Workflow.StepFunctions.StateMachineARN)
+	require.NotNil(t, cfg.Workflow.StepFunctions.CallerAssumeRole)
+	assert.Equal(t, "arn:aws:iam::123456789:role/sfn-caller", cfg.Workflow.StepFunctions.CallerAssumeRole.RoleARN)
 }
 
 func TestLoadFromViper_TailscaleAuthConfig(t *testing.T) {

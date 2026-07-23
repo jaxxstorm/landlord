@@ -1,0 +1,46 @@
+{
+  "Comment": "Landlord tenant lifecycle workflow v1",
+  "StartAt": "InvokeLifecycle",
+  "States": {
+    "InvokeLifecycle": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${LifecycleLambdaArn}",
+        "Payload": {
+          "request.$": "$",
+          "workflow_execution_id.$": "$$.Execution.Id"
+        }
+      },
+      "OutputPath": "$.Payload",
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException"
+          ],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 3,
+          "BackoffRate": 2.0
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.error",
+          "Next": "LifecycleFailed"
+        }
+      ],
+      "Next": "LifecycleSucceeded"
+    },
+    "LifecycleSucceeded": {
+      "Type": "Succeed"
+    },
+    "LifecycleFailed": {
+      "Type": "Fail",
+      "Error": "LifecycleExecutionFailed",
+      "Cause": "The Lambda lifecycle handler returned an error."
+    }
+  }
+}

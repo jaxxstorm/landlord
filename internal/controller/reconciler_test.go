@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
 	"runtime"
 	"testing"
@@ -13,10 +14,13 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jaxxstorm/landlord/internal/compute"
+	computemock "github.com/jaxxstorm/landlord/internal/compute/providers/mock"
 	"github.com/jaxxstorm/landlord/internal/config"
 	"github.com/jaxxstorm/landlord/internal/tenant"
 	tenantpg "github.com/jaxxstorm/landlord/internal/tenant/postgres"
 	"github.com/jaxxstorm/landlord/internal/workflow"
+	"github.com/jaxxstorm/landlord/internal/workflow/lifecycle"
+	workflowstepfunctions "github.com/jaxxstorm/landlord/internal/workflow/providers/stepfunctions"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
@@ -53,7 +57,12 @@ func setupTestReconciler(t *testing.T) (*Reconciler, *tenantpg.Repository, func(
 			"POSTGRES_PASSWORD": "testpass",
 			"POSTGRES_DB":       "testdb",
 		},
-		WaitingFor: wait.ForListeningPort("5432/tcp"),
+		WaitingFor: wait.ForAll(
+			wait.ForListeningPort("5432/tcp"),
+			// The postgres image starts once during initialization and again for
+			// normal serving; wait for the latter before running migrations.
+			wait.ForLog("database system is ready to accept connections").WithOccurrence(2),
+		),
 	}
 
 	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
@@ -127,6 +136,9 @@ func setupTestReconciler(t *testing.T) (*Reconciler, *tenantpg.Repository, func(
 	reconciler := NewReconciler(repo, wfClient, cfg, logger)
 
 	cleanup := func() {
+		if sourceErr, databaseErr := m.Close(); sourceErr != nil || databaseErr != nil {
+			t.Logf("failed to close migration resources: source=%v database=%v", sourceErr, databaseErr)
+		}
 		pool.Close()
 		if err := container.Terminate(ctx); err != nil {
 			t.Logf("failed to terminate container: %s", err)
@@ -144,6 +156,55 @@ type MockWorkflowProvider struct {
 	lastStartExecutionID  string
 	simulateError         bool
 	simulateSlowExecution bool
+}
+
+type lambdaLifecycleWorkflowClient struct {
+	handler *workflowstepfunctions.LifecycleHandler
+	status  map[string]*workflow.ExecutionStatus
+}
+
+func (c *lambdaLifecycleWorkflowClient) TriggerWorkflow(ctx context.Context, t *tenant.Tenant, action string) (string, error) {
+	return c.TriggerWorkflowWithSource(ctx, t, action, "controller")
+}
+
+func (c *lambdaLifecycleWorkflowClient) TriggerWorkflowWithSource(ctx context.Context, t *tenant.Tenant, action, _ string) (string, error) {
+	executionID := fmt.Sprintf("arn:aws:states:us-west-2:123456789012:execution:landlord-lifecycle:%s", t.ID)
+	result, err := c.handler.Handle(ctx, &workflowstepfunctions.LifecycleRequest{
+		Request: &workflow.ProvisionRequest{
+			TenantID:        t.Name,
+			TenantUUID:      t.ID.String(),
+			Operation:       action,
+			DesiredConfig:   t.DesiredConfig,
+			ComputeProvider: "mock",
+		},
+		WorkflowExecutionID: executionID,
+	})
+	if err != nil {
+		return "", err
+	}
+	c.status[executionID] = &workflow.ExecutionStatus{
+		ExecutionID: executionID, ProviderType: "step-functions", State: result.State, Output: result.Output,
+	}
+	return executionID, nil
+}
+
+func (c *lambdaLifecycleWorkflowClient) GetExecutionStatus(_ context.Context, executionID string) (*workflow.ExecutionStatus, error) {
+	status, ok := c.status[executionID]
+	if !ok {
+		return nil, workflow.ErrExecutionNotFound
+	}
+	return status, nil
+}
+
+func (c *lambdaLifecycleWorkflowClient) DetermineAction(status tenant.Status) (string, error) {
+	if status == tenant.StatusRequested {
+		return "provision", nil
+	}
+	return "", fmt.Errorf("no action for tenant status %s", status)
+}
+
+func (c *lambdaLifecycleWorkflowClient) StopExecution(context.Context, *tenant.Tenant, string, string) error {
+	return nil
 }
 
 func (m *MockWorkflowProvider) Name() string {
@@ -298,6 +359,38 @@ func TestReconcilerIntegration_EndToEndProvisioning(t *testing.T) {
 	final, err := repo.GetTenantByID(ctx, tenantID)
 	require.NoError(t, err)
 	require.Equal(t, tenant.StatusReady, final.Status)
+}
+
+func TestReconcilerIntegration_StepFunctionsLambdaLifecycle(t *testing.T) {
+	reconciler, repo, cleanup := setupTestReconciler(t)
+	defer cleanup()
+
+	logger := zap.NewNop()
+	computeRegistry := compute.NewRegistry(logger)
+	require.NoError(t, computeRegistry.Register(computemock.New()))
+	executor, err := lifecycle.NewExecutor(computeRegistry, nil, "step-functions", logger)
+	require.NoError(t, err)
+	handler, err := workflowstepfunctions.NewLifecycleHandler(executor)
+	require.NoError(t, err)
+	reconciler.workflowClient = &lambdaLifecycleWorkflowClient{handler: handler, status: make(map[string]*workflow.ExecutionStatus)}
+
+	ctx := context.Background()
+	tenantID := uuid.New()
+	require.NoError(t, repo.CreateTenant(ctx, &tenant.Tenant{
+		ID: tenantID, Name: "step-functions-e2e", Status: tenant.StatusRequested,
+		DesiredConfig: map[string]interface{}{"image": "nginx:latest"},
+	}))
+
+	require.NoError(t, reconciler.reconcile(tenantID.String()))
+	provisioning, err := repo.GetTenantByID(ctx, tenantID)
+	require.NoError(t, err)
+	require.Equal(t, tenant.StatusProvisioning, provisioning.Status)
+	require.NotNil(t, provisioning.WorkflowExecutionID)
+
+	require.NoError(t, reconciler.reconcile(tenantID.String()))
+	ready, err := repo.GetTenantByID(ctx, tenantID)
+	require.NoError(t, err)
+	require.Equal(t, tenant.StatusReady, ready.Status)
 }
 
 func TestReconcilerIntegration_ListingForReconciliation(t *testing.T) {

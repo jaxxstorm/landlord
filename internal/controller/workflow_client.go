@@ -73,7 +73,7 @@ func (wc *WorkflowClient) TriggerWorkflowWithSource(ctx context.Context, t *tena
 
 	// Determine workflow ID based on action
 	workflowID := fmt.Sprintf("tenant-%s-%s", t.ID.String(), action)
-	if wc.providerType == "restate" || wc.providerType == "temporal" {
+	if wc.providerType == "restate" || wc.providerType == "temporal" || wc.providerType == "step-functions" {
 		workflowID = "tenant-provisioning"
 	}
 
@@ -84,7 +84,7 @@ func (wc *WorkflowClient) TriggerWorkflowWithSource(ctx context.Context, t *tena
 		DesiredConfig: t.DesiredConfig,
 		Metadata:      make(map[string]string),
 	}
-	
+
 	// Add config hash to metadata if computed successfully
 	if configHash != "" {
 		request.Metadata["config_hash"] = configHash

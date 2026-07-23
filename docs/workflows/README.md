@@ -36,7 +36,10 @@ Fully managed serverless workflow service from AWS.
 
 Best for: Teams already using AWS heavily.
 
-Requires: AWS account, IAM credentials, configuration of region and role ARN.
+Requires: AWS account, IAM credentials, a Standard state-machine ARN, and
+configuration of the caller role when the default AWS credential chain is not
+used. The caller role is separate from the state machine and Lambda execution
+roles.
 
 ---
 

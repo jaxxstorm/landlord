@@ -253,7 +253,10 @@ workflow:
   default_provider: step-functions
   step_functions:
     region: us-east-1
-    role_arn: arn:aws:iam::123456789012:role/landlord-workflow-executor
+    state_machine_arn: arn:aws:states:us-east-1:123456789012:stateMachine:landlord-lifecycle
+    caller_assume_role:
+      role_arn: arn:aws:iam::123456789012:role/landlord-step-functions-caller
+      session_name: landlord-control-plane
 
 controller:
   enabled: true
@@ -304,7 +307,7 @@ controller:
     "default_provider": "mock",
     "step_functions": {
       "region": "us-west-2",
-      "role_arn": ""
+      "state_machine_arn": "arn:aws:states:us-west-2:123456789012:stateMachine:landlord-lifecycle"
     }
   }
 }
@@ -316,7 +319,7 @@ controller:
 - **Number**: `"port": 8080`
 - **Duration string**: `"timeout": "30s"` (must be quoted)
 - **Boolean**: `"debug": true` or `"debug": false`
-- **Null**: `"role_arn": null`
+- **Null**: `"state_machine_arn": null`
 - **Objects/Arrays**: Standard JSON nesting
 
 ### JSON Example: Minimal Configuration
@@ -459,7 +462,17 @@ Compute providers are configured in the config file via provider blocks (e.g., `
 |----------|------|---------|-------------|
 | `WORKFLOW_DEFAULT_PROVIDER` | string | `mock` | Default workflow provider |
 | `WORKFLOW_SFN_REGION` | string | `us-west-2` | AWS Step Functions region |
-| `WORKFLOW_SFN_ROLE_ARN` | string | (empty) | AWS Step Functions execution role ARN |
+| `WORKFLOW_SFN_STATE_MACHINE_ARN` | string | (empty) | Required ARN of the shared Standard lifecycle state machine |
+| `WORKFLOW_SFN_CALLER_ASSUME_ROLE_ARN` | string | (empty) | Optional role used by Landlord to call Step Functions |
+| `WORKFLOW_SFN_CALLER_ASSUME_ROLE_EXTERNAL_ID` | string | (empty) | Optional external ID for the caller role |
+| `WORKFLOW_SFN_CALLER_ASSUME_ROLE_SESSION_NAME` | string | (empty) | Optional session name for the caller role |
+
+When `WORKFLOW_DEFAULT_PROVIDER=step-functions`, both
+`WORKFLOW_SFN_REGION` and `WORKFLOW_SFN_STATE_MACHINE_ARN` are required. The
+caller assume-role variables configure only the Landlord control plane; the
+Lambda uses its AWS execution role. See the [Step Functions provider
+runbook](step-functions.md) for the required Lambda configuration, IAM roles,
+and deployment steps.
 
 ### Controller Configuration
 
@@ -710,6 +723,9 @@ data:
         service_name_prefix: landlord-tenant-
     workflow:
       default_provider: step-functions
+      step_functions:
+        region: us-east-1
+        state_machine_arn: arn:aws:states:us-east-1:123456789012:stateMachine:landlord-lifecycle
 ```
 
 Pod manifest:
@@ -775,12 +791,13 @@ compute:
   ecs:
     cluster_arn: arn:aws:ecs:us-east-1:123456789012:cluster/landlord
     task_definition_arn: arn:aws:ecs:us-east-1:123456789012:task-definition/tenant-app:12
+    service_name_prefix: landlord-tenant-
 
 workflow:
   default_provider: step-functions
   step_functions:
     region: us-east-1
-    role_arn: arn:aws:iam::123456789012:role/landlord-executor
+    state_machine_arn: arn:aws:states:us-east-1:123456789012:stateMachine:landlord-lifecycle
 ```
 
 Set database password via environment (never commit to config):

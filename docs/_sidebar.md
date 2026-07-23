@@ -1,6 +1,7 @@
 - [Overview](README.md)
 - [Quickstart](quickstart.md)
 - [Temporal Local Development](temporal-local-development.md)
+- [Step Functions Provider](step-functions.md)
 
 - Components
   - [Compute Providers](compute-providers.md)

@@ -16,8 +16,17 @@ type WorkflowConfig struct {
 
 // StepFunctionsConfig holds AWS Step Functions provider configuration
 type StepFunctionsConfig struct {
-	Region  string `mapstructure:"region" env:"WORKFLOW_SFN_REGION" default:"us-west-2"`
-	RoleARN string `mapstructure:"role_arn" env:"WORKFLOW_SFN_ROLE_ARN"`
+	Region           string                         `mapstructure:"region" env:"WORKFLOW_SFN_REGION" default:"us-west-2"`
+	StateMachineARN  string                         `mapstructure:"state_machine_arn" env:"WORKFLOW_SFN_STATE_MACHINE_ARN"`
+	CallerAssumeRole *StepFunctionsAssumeRoleConfig `mapstructure:"caller_assume_role"`
+}
+
+// StepFunctionsAssumeRoleConfig configures an optional role used by Landlord
+// when it calls the Step Functions control-plane API.
+type StepFunctionsAssumeRoleConfig struct {
+	RoleARN     string `mapstructure:"role_arn"`
+	ExternalID  string `mapstructure:"external_id"`
+	SessionName string `mapstructure:"session_name"`
 }
 
 // RestateConfig holds Restate.dev workflow provider configuration
@@ -58,7 +67,7 @@ func (w *WorkflowConfig) Validate() error {
 		return fmt.Errorf("invalid default_provider: %s (must be mock, step-functions, restate, or temporal)", w.DefaultProvider)
 	}
 
-	// If Step Functions is the default provider, ensure RoleARN is configured
+	// If Step Functions is the default provider, ensure its execution target is configured.
 	if w.DefaultProvider == "step-functions" {
 		if err := w.StepFunctions.Validate(); err != nil {
 			return fmt.Errorf("step functions config: %w", err)
@@ -96,13 +105,16 @@ func (w *WorkflowConfig) Validate() error {
 	return nil
 }
 
-// Validate validates Step Functions configuration
+// Validate validates Step Functions configuration.
 func (s *StepFunctionsConfig) Validate() error {
-	if s.RoleARN == "" {
-		return fmt.Errorf("role ARN is required for Step Functions provider")
-	}
 	if s.Region == "" {
 		return fmt.Errorf("region is required for Step Functions provider")
+	}
+	if s.StateMachineARN == "" {
+		return fmt.Errorf("state machine ARN is required for Step Functions provider")
+	}
+	if s.CallerAssumeRole != nil && s.CallerAssumeRole.RoleARN == "" {
+		return fmt.Errorf("caller assume-role ARN is required when caller assume-role is configured")
 	}
 	return nil
 }

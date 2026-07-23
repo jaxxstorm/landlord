@@ -31,7 +31,8 @@ workflow:
 
 ## AWS Step Functions
 
-Step Functions is a fully managed AWS workflow service. This provider integrates with AWS Step Functions state machines.
+Step Functions is a fully managed AWS workflow service. Landlord starts each
+tenant lifecycle operation on one pre-provisioned Standard state machine.
 
 Public documentation:
 - https://docs.aws.amazon.com/step-functions/
@@ -40,11 +41,22 @@ Configuration example:
 
 ```yaml
 workflow:
-  default_provider: step_functions
+  default_provider: step-functions
   step_functions:
     region: us-west-2
-    role_arn: arn:aws:iam::123456789012:role/LandlordStepFunctionsRole
+    state_machine_arn: arn:aws:states:us-west-2:123456789012:stateMachine:landlord-lifecycle
+    caller_assume_role:
+      role_arn: arn:aws:iam::123456789012:role/LandlordStepFunctionsCaller
+      session_name: landlord-control-plane
 ```
+
+`state_machine_arn` identifies the shared state machine and is required when
+`step-functions` is the default provider. `caller_assume_role` is optional and
+only grants the Landlord control plane access to the Step Functions API; it is
+not the state machine or Lambda execution role.
+
+See the [Step Functions provider runbook](step-functions.md) for deployment,
+IAM, configuration, operations, and troubleshooting.
 
 ## Mock provider
 

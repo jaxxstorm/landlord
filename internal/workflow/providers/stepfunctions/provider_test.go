@@ -11,10 +11,10 @@ import (
 
 func TestInvokeAcceptsProvisioningPayload(t *testing.T) {
 	logger := zaptest.NewLogger(t)
-	provider, err := New(context.Background(), Config{
-		Region:  "us-east-1",
-		RoleARN: "arn:aws:iam::123456789012:role/test",
-	}, logger)
+	provider, err := NewWithClients(Config{
+		Region:          "us-east-1",
+		StateMachineARN: "arn:aws:states:us-east-1:123456789012:stateMachine:landlord",
+	}, logger, testSFNClient{}, testSTSClient{})
 	require.NoError(t, err)
 
 	request := &workflow.ProvisionRequest{

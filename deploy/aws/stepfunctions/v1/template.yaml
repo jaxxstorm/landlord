@@ -1,0 +1,135 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Landlord Step Functions lifecycle workflow v1 reference deployment
+
+Parameters:
+  LambdaCodeBucket:
+    Type: String
+    Description: S3 bucket containing the Lambda bootstrap ZIP.
+  LambdaCodeKey:
+    Type: String
+    Description: S3 key containing the Lambda bootstrap ZIP.
+  StateMachineDefinitionBucket:
+    Type: String
+    Description: S3 bucket containing lifecycle.asl.json.
+  StateMachineDefinitionKey:
+    Type: String
+    Default: lifecycle.asl.json
+    Description: S3 key containing lifecycle.asl.json.
+  LambdaComputePolicyArn:
+    Type: String
+    Description: Customer-managed policy granting only the configured compute provider permissions.
+  LambdaSecurityGroupIds:
+    Type: CommaDelimitedList
+    Default: ''
+    Description: Security groups when the Lambda must reach private database or compute endpoints.
+  LambdaSubnetIds:
+    Type: CommaDelimitedList
+    Default: ''
+    Description: Private subnets when the Lambda must reach private database or compute endpoints.
+
+Resources:
+  LifecycleLambdaLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      RetentionInDays: 30
+
+  LifecycleStateMachineLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      RetentionInDays: 30
+
+  LifecycleLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - !Ref LambdaComputePolicyArn
+      Policies:
+        - PolicyName: StepFunctionsCancellationStatus
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: states:DescribeExecution
+                Resource: '*'
+
+  LifecycleLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: provided.al2023
+      Handler: bootstrap
+      Role: !GetAtt LifecycleLambdaRole.Arn
+      Timeout: 900
+      MemorySize: 512
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Ref LambdaCodeKey
+      Environment:
+        Variables:
+          LANDLORD_WORKFLOW_PROVIDER: step-functions
+
+  LifecycleStateMachineRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: states.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: InvokeLifecycleLambda
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: lambda:InvokeFunction
+                Resource: !GetAtt LifecycleLambda.Arn
+        - PolicyName: WriteExecutionLogs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogDelivery
+                  - logs:GetLogDelivery
+                  - logs:UpdateLogDelivery
+                  - logs:DeleteLogDelivery
+                  - logs:ListLogDeliveries
+                  - logs:PutResourcePolicy
+                  - logs:DescribeResourcePolicies
+                  - logs:DescribeLogGroups
+                Resource: '*'
+
+  LifecycleStateMachine:
+    Type: AWS::StepFunctions::StateMachine
+    Properties:
+      StateMachineType: STANDARD
+      RoleArn: !GetAtt LifecycleStateMachineRole.Arn
+      DefinitionS3Location:
+        Bucket: !Ref StateMachineDefinitionBucket
+        Key: !Ref StateMachineDefinitionKey
+      DefinitionSubstitutions:
+        LifecycleLambdaArn: !GetAtt LifecycleLambda.Arn
+      LoggingConfiguration:
+        Destinations:
+          - CloudWatchLogsLogGroup:
+              LogGroupArn: !GetAtt LifecycleStateMachineLogGroup.Arn
+        IncludeExecutionData: true
+        Level: ALL
+
+Outputs:
+  StateMachineArn:
+    Description: Configure as workflow.step_functions.state_machine_arn.
+    Value: !Ref LifecycleStateMachine
+  LambdaArn:
+    Description: Lifecycle Lambda function ARN.
+    Value: !GetAtt LifecycleLambda.Arn

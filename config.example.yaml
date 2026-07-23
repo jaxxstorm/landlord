@@ -200,15 +200,22 @@ workflow:
   # AWS Step Functions Workflow Provider Configuration
   # ============================================================================
   # Uncomment this section to enable Step Functions provider
+  # See docs/step-functions.md for Lambda packaging, IAM, deployment, and operations.
   
   # step_functions:
   #   # AWS region where Step Functions state machines are deployed
   #   region: us-west-2
   #
-  #   # IAM role ARN for Step Functions execution
-  #   # REQUIRED if step_functions provider is used
-  #   # Example: arn:aws:iam::123456789012:role/LandlordStepFunctionsRole
-  #   role_arn: ""
+  #   # ARN of the pre-provisioned Standard lifecycle state machine
+  #   # REQUIRED if step-functions is the default provider
+  #   state_machine_arn: arn:aws:states:us-west-2:123456789012:stateMachine:landlord-lifecycle
+  #
+  #   # Optional role Landlord assumes to call the Step Functions API.
+  #   # This is distinct from the state machine and Lambda execution roles.
+  #   caller_assume_role:
+  #     role_arn: arn:aws:iam::123456789012:role/LandlordStepFunctionsCaller
+  #     external_id: ""
+  #     session_name: landlord-control-plane
 
   # ============================================================================
   # Temporal Workflow Provider Configuration
@@ -304,10 +311,10 @@ controller:
 #     label_prefix: landlord
 #
 # workflow:
-#   default_provider: step_functions
+#   default_provider: step-functions
 #   step_functions:
 #     region: us-east-1
-#     role_arn: arn:aws:iam::ACCOUNT:role/LandlordStepFunctions
+#     state_machine_arn: arn:aws:states:us-east-1:ACCOUNT:stateMachine:landlord-lifecycle
 #
 # database:
 #   provider: postgres

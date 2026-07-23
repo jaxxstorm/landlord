@@ -141,8 +141,17 @@ func BindEnvironmentVariables(v *viper.Viper) error {
 	if err := v.BindEnv("workflow.step_functions.region", "WORKFLOW_SFN_REGION"); err != nil {
 		return fmt.Errorf("failed to bind WORKFLOW_SFN_REGION: %w", err)
 	}
-	if err := v.BindEnv("workflow.step_functions.role_arn", "WORKFLOW_SFN_ROLE_ARN"); err != nil {
-		return fmt.Errorf("failed to bind WORKFLOW_SFN_ROLE_ARN: %w", err)
+	if err := v.BindEnv("workflow.step_functions.state_machine_arn", "WORKFLOW_SFN_STATE_MACHINE_ARN"); err != nil {
+		return fmt.Errorf("failed to bind WORKFLOW_SFN_STATE_MACHINE_ARN: %w", err)
+	}
+	if err := v.BindEnv("workflow.step_functions.caller_assume_role.role_arn", "WORKFLOW_SFN_CALLER_ASSUME_ROLE_ARN"); err != nil {
+		return fmt.Errorf("failed to bind WORKFLOW_SFN_CALLER_ASSUME_ROLE_ARN: %w", err)
+	}
+	if err := v.BindEnv("workflow.step_functions.caller_assume_role.external_id", "WORKFLOW_SFN_CALLER_ASSUME_ROLE_EXTERNAL_ID"); err != nil {
+		return fmt.Errorf("failed to bind WORKFLOW_SFN_CALLER_ASSUME_ROLE_EXTERNAL_ID: %w", err)
+	}
+	if err := v.BindEnv("workflow.step_functions.caller_assume_role.session_name", "WORKFLOW_SFN_CALLER_ASSUME_ROLE_SESSION_NAME"); err != nil {
+		return fmt.Errorf("failed to bind WORKFLOW_SFN_CALLER_ASSUME_ROLE_SESSION_NAME: %w", err)
 	}
 	if err := v.BindEnv("workflow.restate.endpoint", "WORKFLOW_RESTATE_ENDPOINT"); err != nil {
 		return fmt.Errorf("failed to bind WORKFLOW_RESTATE_ENDPOINT: %w", err)

@@ -248,6 +248,66 @@ func TestTemporalConfigValidation(t *testing.T) {
 	}
 }
 
+func TestStepFunctionsConfigValidation(t *testing.T) {
+	tests := []struct {
+		name      string
+		cfg       config.StepFunctionsConfig
+		shouldErr bool
+		errMsg    string
+	}{
+		{
+			name: "valid configuration with caller assume role",
+			cfg: config.StepFunctionsConfig{
+				Region:          "us-east-1",
+				StateMachineARN: "arn:aws:states:us-east-1:123456789012:stateMachine:landlord",
+				CallerAssumeRole: &config.StepFunctionsAssumeRoleConfig{
+					RoleARN:     "arn:aws:iam::123456789012:role/landlord-caller",
+					ExternalID:  "external-id",
+					SessionName: "landlord-test",
+				},
+			},
+		},
+		{
+			name: "missing region",
+			cfg: config.StepFunctionsConfig{
+				StateMachineARN: "arn:aws:states:us-east-1:123456789012:stateMachine:landlord",
+			},
+			shouldErr: true,
+			errMsg:    "region is required",
+		},
+		{
+			name: "missing state machine ARN",
+			cfg: config.StepFunctionsConfig{
+				Region: "us-east-1",
+			},
+			shouldErr: true,
+			errMsg:    "state machine ARN is required",
+		},
+		{
+			name: "caller assume role without ARN",
+			cfg: config.StepFunctionsConfig{
+				Region:           "us-east-1",
+				StateMachineARN:  "arn:aws:states:us-east-1:123456789012:stateMachine:landlord",
+				CallerAssumeRole: &config.StepFunctionsAssumeRoleConfig{},
+			},
+			shouldErr: true,
+			errMsg:    "caller assume-role ARN is required",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.cfg.Validate()
+			if tt.shouldErr {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errMsg)
+				return
+			}
+			assert.NoError(t, err)
+		})
+	}
+}
+
 // TestEndpointURLValidation tests URL format validation
 func TestEndpointURLValidation(t *testing.T) {
 	tests := []struct {

@@ -176,7 +176,7 @@ workflow:
   default_provider: step-functions
   step_functions:
     region: us-east-1
-    role_arn: arn:aws:iam::123456789012:role/landlord-executor
+    state_machine_arn: arn:aws:states:us-east-1:123456789012:stateMachine:landlord-lifecycle
 ```
 
 #### Step 2: Use Secrets from Environment
@@ -184,7 +184,9 @@ workflow:
 ```bash
 # Secrets still come from environment/secrets manager
 export DB_PASSWORD=$(aws secretsmanager get-secret-value --secret-id landlord/db-password --query 'SecretString' --output text)
-export WORKFLOW_SFN_ROLE_ARN=$(aws secretsmanager get-secret-value --secret-id landlord/sfn-role --query 'SecretString' --output text)
+export WORKFLOW_SFN_STATE_MACHINE_ARN=arn:aws:states:us-east-1:123456789012:stateMachine:landlord-lifecycle
+# Optional when Landlord must assume a separate caller role.
+export WORKFLOW_SFN_CALLER_ASSUME_ROLE_ARN=$(aws secretsmanager get-secret-value --secret-id landlord/sfn-caller-role --query 'SecretString' --output text)
 
 ./landlord
 ```
@@ -371,11 +373,13 @@ spec:
             secretKeyRef:
               name: landlord-secrets
               key: db_password
-        - name: WORKFLOW_SFN_ROLE_ARN
+        - name: WORKFLOW_SFN_STATE_MACHINE_ARN
+          value: arn:aws:states:us-east-1:123456789012:stateMachine:landlord-lifecycle
+        - name: WORKFLOW_SFN_CALLER_ASSUME_ROLE_ARN
           valueFrom:
             secretKeyRef:
               name: landlord-secrets
-              key: sfn_role_arn
+              key: sfn_caller_role_arn
         - name: LANDLORD_CONFIG
           value: /etc/landlord/config.yaml
         volumeMounts:

@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jaxxstorm/landlord/internal/tenant"
 	"github.com/jaxxstorm/landlord/internal/workflow"
+	"github.com/stretchr/testify/require"
 )
 
 // mockTenantRepository implements tenant.Repository for testing controller
@@ -228,61 +229,67 @@ func TestControllerUpdatesAfterCompletion(t *testing.T) {
 }
 
 // TestControllerUpdatesAfterFailure tests controller marks tenant failed after workflow failure
-func TestControllerUpdatesAfterFailure(t *testing.T) {
+func TestControllerUpdatesAfterTerminalFailure(t *testing.T) {
+	for _, executionState := range []workflow.ExecutionState{workflow.StateFailed, workflow.StateTimedOut, workflow.StateCancelled} {
+		t.Run(string(executionState), func(t *testing.T) {
+			logger, _ := zap.NewDevelopment()
+			failedTenant := &tenant.Tenant{
+				ID:                  uuid.New(),
+				Name:                "test-tenant",
+				Status:              tenant.StatusProvisioning,
+				WorkflowExecutionID: stringPtr("exec-failed-123"),
+			}
+
+			triggerCount := 0
+			updatedStatus := tenant.Status("")
+			wfClient := &mockWorkflowClientForController{
+				triggerWithSourceFunc: func(ctx context.Context, t *tenant.Tenant, action, source string) (string, error) {
+					triggerCount++
+					return "exec-retry", nil
+				},
+				getStatusFunc: func(ctx context.Context, executionID string) (*workflow.ExecutionStatus, error) {
+					return &workflow.ExecutionStatus{ExecutionID: executionID, State: executionState}, nil
+				},
+			}
+
+			tenantRepo := &mockTenantRepository{
+				getTenantByIDFunc: func(ctx context.Context, id uuid.UUID) (*tenant.Tenant, error) {
+					return failedTenant, nil
+				},
+				updateTenantFunc: func(ctx context.Context, t *tenant.Tenant) error {
+					updatedStatus = t.Status
+					return nil
+				},
+			}
+
+			reconciler := &Reconciler{tenantRepo: tenantRepo, workflowClient: wfClient, logger: logger, ctx: context.Background()}
+			require.NoError(t, reconciler.reconcile(failedTenant.ID.String()))
+			require.Zero(t, triggerCount)
+			require.Equal(t, tenant.StatusFailed, updatedStatus)
+		})
+	}
+}
+
+func TestControllerDefersMissingExecutionStatus(t *testing.T) {
 	logger, _ := zap.NewDevelopment()
-
-	failedTenant := &tenant.Tenant{
-		ID:                  uuid.New(),
-		Name:                "test-tenant",
-		Status:              tenant.StatusProvisioning,
-		WorkflowExecutionID: stringPtr("exec-failed-123"),
-	}
-
-	triggerCount := 0
-	updatedStatus := tenant.Status("")
-	wfClient := &mockWorkflowClientForController{
-		triggerWithSourceFunc: func(ctx context.Context, t *tenant.Tenant, action, source string) (string, error) {
-			triggerCount++
-			return "exec-retry", nil
-		},
-		getStatusFunc: func(ctx context.Context, executionID string) (*workflow.ExecutionStatus, error) {
-			// Return failed state - should trigger new execution
-			return &workflow.ExecutionStatus{
-				ExecutionID: executionID,
-				State:       workflow.StateFailed,
-			}, nil
-		},
-	}
-
-	tenantRepo := &mockTenantRepository{
-		getTenantByIDFunc: func(ctx context.Context, id uuid.UUID) (*tenant.Tenant, error) {
-			return failedTenant, nil
-		},
-		updateTenantFunc: func(ctx context.Context, t *tenant.Tenant) error {
-			updatedStatus = t.Status
-			return nil
-		},
-	}
-
+	tenantValue := &tenant.Tenant{ID: uuid.New(), Name: "test-tenant", Status: tenant.StatusProvisioning, WorkflowExecutionID: stringPtr("missing")}
+	updates := 0
 	reconciler := &Reconciler{
-		tenantRepo:     tenantRepo,
-		workflowClient: wfClient,
-		logger:         logger,
-		ctx:            context.Background(),
+		tenantRepo: &mockTenantRepository{
+			getTenantByIDFunc: func(context.Context, uuid.UUID) (*tenant.Tenant, error) { return tenantValue, nil },
+			updateTenantFunc:  func(context.Context, *tenant.Tenant) error { updates++; return nil },
+		},
+		workflowClient: &mockWorkflowClientForController{
+			getStatusFunc: func(context.Context, string) (*workflow.ExecutionStatus, error) {
+				return nil, workflow.ErrExecutionNotFound
+			},
+		},
+		logger: logger,
+		ctx:    context.Background(),
 	}
 
-	err := reconciler.reconcile(failedTenant.ID.String())
-	if err != nil {
-		t.Errorf("reconcile should not fail: %v", err)
-	}
-
-	// Should update tenant and not trigger new workflow
-	if triggerCount != 0 {
-		t.Errorf("expected no trigger after failure, got %d triggers", triggerCount)
-	}
-	if updatedStatus != tenant.StatusFailed {
-		t.Errorf("expected status failed after failure, got %s", updatedStatus)
-	}
+	require.NoError(t, reconciler.reconcile(tenantValue.ID.String()))
+	require.Zero(t, updates)
 }
 
 func TestControllerDeletesAfterDeleteWorkflowSuccess(t *testing.T) {

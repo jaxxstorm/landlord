@@ -1,55 +1,55 @@
 package stepfunctions
 
 import (
-    "testing"
+	"testing"
 
-    "github.com/aws/aws-sdk-go-v2/service/sfn/types"
-    "github.com/jaxxstorm/landlord/internal/workflow"
-    "github.com/stretchr/testify/assert"
+	"github.com/aws/aws-sdk-go-v2/service/sfn/types"
+	"github.com/jaxxstorm/landlord/internal/workflow"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestMapExecutionStateRunning(t *testing.T) {
-    state := mapExecutionState(types.ExecutionStatusRunning)
-    assert.Equal(t, workflow.StateRunning, state)
+	state := mapExecutionState(types.ExecutionStatusRunning)
+	assert.Equal(t, workflow.StateRunning, state)
 }
 
 func TestMapExecutionStateSucceeded(t *testing.T) {
-    state := mapExecutionState(types.ExecutionStatusSucceeded)
-    assert.Equal(t, workflow.StateSucceeded, state)
+	state := mapExecutionState(types.ExecutionStatusSucceeded)
+	assert.Equal(t, workflow.StateSucceeded, state)
 }
 
 func TestMapExecutionStateFailed(t *testing.T) {
-    state := mapExecutionState(types.ExecutionStatusFailed)
-    assert.Equal(t, workflow.StateFailed, state)
+	state := mapExecutionState(types.ExecutionStatusFailed)
+	assert.Equal(t, workflow.StateFailed, state)
 }
 
 func TestMapExecutionStateTimedOut(t *testing.T) {
-    state := mapExecutionState(types.ExecutionStatusTimedOut)
-    assert.Equal(t, workflow.StateFailed, state)
+	state := mapExecutionState(types.ExecutionStatusTimedOut)
+	assert.Equal(t, workflow.StateTimedOut, state)
 }
 
 func TestMapExecutionStateAborted(t *testing.T) {
-    state := mapExecutionState(types.ExecutionStatusAborted)
-    assert.Equal(t, workflow.StateFailed, state)
+	state := mapExecutionState(types.ExecutionStatusAborted)
+	assert.Equal(t, workflow.StateFailed, state)
 }
 
 func TestMapExecutionStateDefault(t *testing.T) {
-    // Test an unknown state type
-    state := mapExecutionState(types.ExecutionStatus("UNKNOWN"))
-    assert.Equal(t, workflow.StatePending, state)
+	// Test an unknown state type
+	state := mapExecutionState(types.ExecutionStatus("UNKNOWN"))
+	assert.Equal(t, workflow.StatePending, state)
 }
 
 func TestMapExecutionSubStateRunning(t *testing.T) {
-    subState := mapExecutionSubState(types.ExecutionStatusRunning)
-    assert.Equal(t, workflow.SubStateRunning, subState)
+	subState := mapExecutionSubState(types.ExecutionStatusRunning)
+	assert.Equal(t, workflow.SubStateRunning, subState)
 }
 
 func TestMapExecutionSubStateSucceeded(t *testing.T) {
-    subState := mapExecutionSubState(types.ExecutionStatusSucceeded)
-    assert.Equal(t, workflow.SubStateSucceeded, subState)
+	subState := mapExecutionSubState(types.ExecutionStatusSucceeded)
+	assert.Equal(t, workflow.SubStateSucceeded, subState)
 }
 
 func TestMapExecutionSubStateUnknown(t *testing.T) {
-    subState := mapExecutionSubState(types.ExecutionStatus("UNKNOWN"))
-    assert.Equal(t, workflow.SubStateWaiting, subState)
+	subState := mapExecutionSubState(types.ExecutionStatus("UNKNOWN"))
+	assert.Equal(t, workflow.SubStateWaiting, subState)
 }

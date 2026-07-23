@@ -8,16 +8,17 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jaxxstorm/landlord/internal/compute"
-	"github.com/jaxxstorm/landlord/internal/workflow"
 	"github.com/jaxxstorm/landlord/internal/tenant"
+	"github.com/jaxxstorm/landlord/internal/workflow"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 )
 
 type captureWorkflowProvider struct {
-	name             string
-	invokedWorkflow  string
-	lastProvisionReq *workflow.ProvisionRequest
+	name              string
+	invokedWorkflow   string
+	lastProvisionReq  *workflow.ProvisionRequest
+	provisionRequests []*workflow.ProvisionRequest
 }
 
 func (p *captureWorkflowProvider) Name() string { return p.name }
@@ -26,6 +27,7 @@ func (p *captureWorkflowProvider) Invoke(ctx context.Context, workflowID string,
 	_ = ctx
 	p.invokedWorkflow = workflowID
 	p.lastProvisionReq = request
+	p.provisionRequests = append(p.provisionRequests, request)
 	return &workflow.ExecutionResult{
 		ExecutionID:  "exec-1",
 		WorkflowID:   workflowID,
@@ -259,7 +261,7 @@ func TestIsRetryableError_MultipleErrors(t *testing.T) {
 func TestTriggerWorkflow_ComputesConfigHash(t *testing.T) {
 	// This test verifies that config hash is computed when triggering workflow
 	// The hash computation itself is tested in tenant package
-	
+
 	testTenant := &tenant.Tenant{
 		Name:   "test-tenant",
 		Status: tenant.StatusRequested,
@@ -292,27 +294,36 @@ func TestTriggerWorkflow_ComputesConfigHash(t *testing.T) {
 	}
 }
 
-func TestTriggerWorkflow_UsesStaticWorkflowIDForTemporal(t *testing.T) {
-	logger, _ := zap.NewDevelopment()
-	provider := &captureWorkflowProvider{name: "temporal"}
-	registry := workflow.NewRegistry(logger)
-	require.NoError(t, registry.Register(provider))
+func TestTriggerWorkflow_UsesStaticWorkflowIDForSharedWorkflowProviders(t *testing.T) {
+	for _, providerName := range []string{"temporal", "step-functions"} {
+		t.Run(providerName, func(t *testing.T) {
+			logger, _ := zap.NewDevelopment()
+			provider := &captureWorkflowProvider{name: providerName}
+			registry := workflow.NewRegistry(logger)
+			require.NoError(t, registry.Register(provider))
 
-	manager := workflow.New(registry, logger)
-	wc := NewWorkflowClient(manager, logger, 5*time.Second, "temporal")
+			manager := workflow.New(registry, logger)
+			wc := NewWorkflowClient(manager, logger, 5*time.Second, providerName)
 
-	testTenant := &tenant.Tenant{
-		ID:     uuid.New(),
-		Name:   "temporal-app",
-		Status: tenant.StatusRequested,
-		DesiredConfig: map[string]interface{}{
-			"image": "nginx:latest",
-		},
+			testTenant := &tenant.Tenant{
+				ID:     uuid.New(),
+				Name:   "shared-workflow-app",
+				Status: tenant.StatusRequested,
+				DesiredConfig: map[string]interface{}{
+					"image":            "nginx:latest",
+					"compute_provider": "ecs",
+				},
+			}
+
+			_, err := wc.TriggerWorkflow(context.Background(), testTenant, "provision")
+			require.NoError(t, err)
+			require.Equal(t, tenantProvisioningWorkflowID, provider.invokedWorkflow)
+			require.Equal(t, testTenant.ID.String(), provider.lastProvisionReq.TenantUUID)
+			require.Equal(t, "provision", provider.lastProvisionReq.Operation)
+			require.Equal(t, "ecs", provider.lastProvisionReq.ComputeProvider)
+			require.NotEmpty(t, provider.lastProvisionReq.Metadata["config_hash"])
+		})
 	}
-
-	_, err := wc.TriggerWorkflow(context.Background(), testTenant, "provision")
-	require.NoError(t, err)
-	require.Equal(t, tenantProvisioningWorkflowID, provider.invokedWorkflow)
 }
 
 func TestTriggerWorkflow_UsesPerTenantWorkflowIDForNonTemporalProviders(t *testing.T) {
@@ -337,6 +348,35 @@ func TestTriggerWorkflow_UsesPerTenantWorkflowIDForNonTemporalProviders(t *testi
 	_, err := wc.TriggerWorkflow(context.Background(), testTenant, "provision")
 	require.NoError(t, err)
 	require.Equal(t, "tenant-"+tenantID.String()+"-provision", provider.invokedWorkflow)
+}
+
+func TestTriggerWorkflow_LifecycleRevisionChangesWithDesiredConfig(t *testing.T) {
+	logger, _ := zap.NewDevelopment()
+	provider := &captureWorkflowProvider{name: "step-functions"}
+	registry := workflow.NewRegistry(logger)
+	require.NoError(t, registry.Register(provider))
+
+	wc := NewWorkflowClient(workflow.New(registry, logger), logger, 5*time.Second, "step-functions")
+	testTenant := &tenant.Tenant{
+		ID:   uuid.New(),
+		Name: "revision-app",
+		DesiredConfig: map[string]interface{}{
+			"image": "nginx:1.25",
+		},
+	}
+
+	_, err := wc.TriggerWorkflow(context.Background(), testTenant, "provision")
+	require.NoError(t, err)
+	_, err = wc.TriggerWorkflow(context.Background(), testTenant, "provision")
+	require.NoError(t, err)
+	require.Len(t, provider.provisionRequests, 2)
+	require.Equal(t, provider.provisionRequests[0].Metadata["config_hash"], provider.provisionRequests[1].Metadata["config_hash"])
+
+	testTenant.DesiredConfig["image"] = "nginx:1.26"
+	_, err = wc.TriggerWorkflow(context.Background(), testTenant, "update")
+	require.NoError(t, err)
+	require.Len(t, provider.provisionRequests, 3)
+	require.NotEqual(t, provider.provisionRequests[0].Metadata["config_hash"], provider.provisionRequests[2].Metadata["config_hash"])
 }
 
 const tenantProvisioningWorkflowID = "tenant-provisioning"

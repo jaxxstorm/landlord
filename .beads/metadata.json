@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "landlord",
+  "project_id": "666d9306-44a2-49ee-99b6-37f9f90df6e2"
+}

@@ -85,3 +85,26 @@ func TestComputeConfigValidate_ECSDefaultsRequired(t *testing.T) {
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "compute.ecs")
 }
+
+func TestComputeConfigValidate_EC2RunnerDefaults(t *testing.T) {
+	cfg := ComputeConfig{EC2Runner: &EC2RunnerProviderConfig{
+		Region:           "us-west-2",
+		InstanceType:     "t3.micro",
+		SubnetID:         "subnet-123",
+		SecurityGroupIDs: []string{"sg-123"},
+	}}
+
+	require.NoError(t, cfg.Validate())
+	require.Equal(t, []string{"ec2-runner"}, cfg.EnabledProviders())
+	require.Equal(t, "ec2-runner", cfg.DefaultProvider())
+}
+
+func TestComputeConfigValidate_RejectsIncompleteEC2RunnerDefaults(t *testing.T) {
+	cfg := ComputeConfig{EC2Runner: &EC2RunnerProviderConfig{
+		Region:       "us-west-2",
+		InstanceType: "t3.micro",
+	}}
+
+	err := cfg.Validate()
+	require.ErrorContains(t, err, "compute.ec2_runner.subnet_id is required")
+}

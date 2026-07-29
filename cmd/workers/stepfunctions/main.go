@@ -8,8 +8,10 @@ import (
 
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jaxxstorm/landlord/internal/cloud/awsconfig"
 	"github.com/jaxxstorm/landlord/internal/compute"
 	computedocker "github.com/jaxxstorm/landlord/internal/compute/providers/docker"
+	computeec2runner "github.com/jaxxstorm/landlord/internal/compute/providers/ec2runner"
 	computedecs "github.com/jaxxstorm/landlord/internal/compute/providers/ecs"
 	computemock "github.com/jaxxstorm/landlord/internal/compute/providers/mock"
 	"github.com/jaxxstorm/landlord/internal/config"
@@ -84,6 +86,32 @@ func initialize() (*zap.Logger, *compute.Registry, *workerDependencies, error) {
 		}
 		if err := registry.Register(provider); err != nil {
 			return nil, nil, nil, err
+		}
+	}
+	if cfg.Compute.EC2Runner != nil {
+		ec2Config := cfg.Compute.EC2Runner
+		var assumeRole *awsconfig.AssumeRoleOptions
+		if ec2Config.AssumeRole != nil {
+			assumeRole = &awsconfig.AssumeRoleOptions{
+				RoleARN:     ec2Config.AssumeRole.RoleARN,
+				ExternalID:  ec2Config.AssumeRole.ExternalID,
+				SessionName: ec2Config.AssumeRole.SessionName,
+			}
+		}
+		provider, err := computeec2runner.New(context.Background(), computeec2runner.Config{
+			Region:           ec2Config.Region,
+			InstanceType:     ec2Config.InstanceType,
+			SubnetID:         ec2Config.SubnetID,
+			SecurityGroupIDs: ec2Config.SecurityGroupIDs,
+			InstanceProfile:  ec2Config.InstanceProfile,
+			KeyName:          ec2Config.KeyName,
+			AssumeRole:       assumeRole,
+		}, log)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("initialize EC2 runner provider: %w", err)
+		}
+		if err := registry.Register(provider); err != nil {
+			return nil, nil, nil, fmt.Errorf("register EC2 runner provider: %w", err)
 		}
 	}
 	if cfg.Compute.Docker != nil {

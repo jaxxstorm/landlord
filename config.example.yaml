@@ -152,6 +152,19 @@ compute:
   #   task_definition_arn: "arn:aws:ecs:us-west-2:123456789012:task-definition/tenant-app:12"
   #   service_name_prefix: "landlord-tenant-"
 
+  # ============================================================================
+  # EC2 Runner Provider Configuration
+  # ============================================================================
+  # ec2_runner:
+  #   region: us-west-2
+  #   instance_type: t3.micro
+  #   subnet_id: subnet-0123456789abcdef0
+  #   security_group_ids:
+  #     - sg-0123456789abcdef0
+  #   # Optional instance profile and key pair remain operator-owned.
+  #   instance_profile: LandlordTenantRunner
+  #   key_name: landlord-debug
+
 ################################################################################
 # WORKFLOW PROVIDER CONFIGURATION
 # =============================================================================#

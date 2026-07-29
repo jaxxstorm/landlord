@@ -8,10 +8,11 @@ import (
 
 // ComputeConfig holds compute provisioning configuration
 type ComputeConfig struct {
-	Docker  *DockerProviderConfig `mapstructure:"docker"`
-	ECS     *ECSProviderConfig    `mapstructure:"ecs"`
-	Mock    *MockProviderConfig   `mapstructure:"mock"`
-	Unknown map[string]interface{} `mapstructure:",remain"`
+	Docker    *DockerProviderConfig    `mapstructure:"docker"`
+	ECS       *ECSProviderConfig       `mapstructure:"ecs"`
+	EC2Runner *EC2RunnerProviderConfig `mapstructure:"ec2_runner"`
+	Mock      *MockProviderConfig      `mapstructure:"mock"`
+	Unknown   map[string]interface{}   `mapstructure:",remain"`
 }
 
 // DockerProviderConfig holds Docker provider configuration
@@ -39,6 +40,25 @@ type DockerProviderConfig struct {
 // ECSProviderConfig holds ECS provider configuration defaults.
 type ECSProviderConfig struct {
 	Defaults map[string]interface{} `mapstructure:",remain"`
+}
+
+// EC2RunnerProviderConfig holds operator-owned EC2 launch defaults. Tenant
+// requests select only their AMI and user-data payload.
+type EC2RunnerProviderConfig struct {
+	Region           string                     `mapstructure:"region"`
+	InstanceType     string                     `mapstructure:"instance_type"`
+	SubnetID         string                     `mapstructure:"subnet_id"`
+	SecurityGroupIDs []string                   `mapstructure:"security_group_ids"`
+	InstanceProfile  string                     `mapstructure:"instance_profile"`
+	KeyName          string                     `mapstructure:"key_name"`
+	AssumeRole       *EC2RunnerAssumeRoleConfig `mapstructure:"assume_role"`
+}
+
+// EC2RunnerAssumeRoleConfig configures an optional role used for EC2 API calls.
+type EC2RunnerAssumeRoleConfig struct {
+	RoleARN     string `mapstructure:"role_arn"`
+	ExternalID  string `mapstructure:"external_id"`
+	SessionName string `mapstructure:"session_name"`
 }
 
 // MockProviderConfig holds mock provider configuration defaults.
@@ -81,6 +101,11 @@ func (c *ComputeConfig) Validate() error {
 			return fmt.Errorf("ecs config: %w", err)
 		}
 	}
+	if c.EC2Runner != nil {
+		if err := c.EC2Runner.Validate(); err != nil {
+			return fmt.Errorf("ec2_runner config: %w", err)
+		}
+	}
 	if c.Mock != nil {
 		if err := c.Mock.Validate(); err != nil {
 			return fmt.Errorf("mock config: %w", err)
@@ -99,10 +124,41 @@ func (c *ComputeConfig) EnabledProviders() []string {
 	if c.ECS != nil {
 		providers = append(providers, "ecs")
 	}
+	if c.EC2Runner != nil {
+		providers = append(providers, "ec2-runner")
+	}
 	if c.Mock != nil {
 		providers = append(providers, "mock")
 	}
 	return providers
+}
+
+// Validate validates operator-owned EC2 runner defaults.
+func (e *EC2RunnerProviderConfig) Validate() error {
+	if e == nil {
+		return nil
+	}
+	if strings.TrimSpace(e.Region) == "" {
+		return fmt.Errorf("compute.ec2_runner.region is required")
+	}
+	if strings.TrimSpace(e.InstanceType) == "" {
+		return fmt.Errorf("compute.ec2_runner.instance_type is required")
+	}
+	if strings.TrimSpace(e.SubnetID) == "" {
+		return fmt.Errorf("compute.ec2_runner.subnet_id is required")
+	}
+	if len(e.SecurityGroupIDs) == 0 {
+		return fmt.Errorf("compute.ec2_runner.security_group_ids is required")
+	}
+	for _, id := range e.SecurityGroupIDs {
+		if strings.TrimSpace(id) == "" {
+			return fmt.Errorf("compute.ec2_runner.security_group_ids must not contain empty values")
+		}
+	}
+	if e.AssumeRole != nil && strings.TrimSpace(e.AssumeRole.RoleARN) == "" {
+		return fmt.Errorf("compute.ec2_runner.assume_role.role_arn is required when assume_role is configured")
+	}
+	return nil
 }
 
 // DefaultProvider returns the only enabled provider when exactly one is configured.

@@ -10,8 +10,9 @@ import (
 	"time"
 
 	"github.com/jaxxstorm/landlord/internal/compute"
-	computedecs "github.com/jaxxstorm/landlord/internal/compute/providers/ecs"
 	computedocker "github.com/jaxxstorm/landlord/internal/compute/providers/docker"
+	computedecs "github.com/jaxxstorm/landlord/internal/compute/providers/ecs"
+	computekubernetes "github.com/jaxxstorm/landlord/internal/compute/providers/kubernetes"
 	computemock "github.com/jaxxstorm/landlord/internal/compute/providers/mock"
 	"github.com/jaxxstorm/landlord/internal/config"
 	"github.com/jaxxstorm/landlord/internal/logger"
@@ -73,6 +74,21 @@ func main() {
 			log.Fatal("Invalid ECS compute defaults", zap.Error(err))
 		}
 		computeRegistry.Register(ecsProvider)
+	}
+	if cfg.Compute.Kubernetes != nil {
+		kubernetesProvider, err := computekubernetes.New(computekubernetes.Config{
+			Kubeconfig: cfg.Compute.Kubernetes.Kubeconfig, Context: cfg.Compute.Kubernetes.Context,
+			APIServer: cfg.Compute.Kubernetes.APIServer, BearerToken: cfg.Compute.Kubernetes.BearerToken,
+			NamespacePrefix:       cfg.Compute.Kubernetes.NamespacePrefix,
+			InsecureSkipTLSVerify: cfg.Compute.Kubernetes.InsecureSkipTLSVerify,
+			Defaults:              cfg.Compute.Kubernetes.Defaults,
+		}, log)
+		if err != nil {
+			log.Fatal("Failed to initialize Kubernetes provider", zap.Error(err))
+		}
+		if err := computeRegistry.Register(kubernetesProvider); err != nil {
+			log.Fatal("Failed to register Kubernetes provider", zap.Error(err))
+		}
 	}
 
 	// Register Docker provider if configured

@@ -13,6 +13,7 @@ import (
 	computedocker "github.com/jaxxstorm/landlord/internal/compute/providers/docker"
 	computeec2runner "github.com/jaxxstorm/landlord/internal/compute/providers/ec2runner"
 	computedecs "github.com/jaxxstorm/landlord/internal/compute/providers/ecs"
+	computekubernetes "github.com/jaxxstorm/landlord/internal/compute/providers/kubernetes"
 	computemock "github.com/jaxxstorm/landlord/internal/compute/providers/mock"
 	"github.com/jaxxstorm/landlord/internal/config"
 	"github.com/jaxxstorm/landlord/internal/database"
@@ -112,6 +113,21 @@ func initialize() (*zap.Logger, *compute.Registry, *workerDependencies, error) {
 		}
 		if err := registry.Register(provider); err != nil {
 			return nil, nil, nil, fmt.Errorf("register EC2 runner provider: %w", err)
+		}
+	}
+	if cfg.Compute.Kubernetes != nil {
+		kubernetesProvider, err := computekubernetes.New(computekubernetes.Config{
+			Kubeconfig: cfg.Compute.Kubernetes.Kubeconfig, Context: cfg.Compute.Kubernetes.Context,
+			APIServer: cfg.Compute.Kubernetes.APIServer, BearerToken: cfg.Compute.Kubernetes.BearerToken,
+			NamespacePrefix:       cfg.Compute.Kubernetes.NamespacePrefix,
+			InsecureSkipTLSVerify: cfg.Compute.Kubernetes.InsecureSkipTLSVerify,
+			Defaults:              cfg.Compute.Kubernetes.Defaults,
+		}, log)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("initialize Kubernetes provider: %w", err)
+		}
+		if err := registry.Register(kubernetesProvider); err != nil {
+			return nil, nil, nil, fmt.Errorf("register Kubernetes provider: %w", err)
 		}
 	}
 	if cfg.Compute.Docker != nil {

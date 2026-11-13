@@ -2,6 +2,7 @@
 - [Quickstart](quickstart.md)
 - [Temporal Local Development](temporal-local-development.md)
 - [Step Functions Provider](step-functions.md)
+- [Floci Integration Tests](floci-integration-tests.md)
 
 - Components
   - [Compute Providers](compute-providers.md)

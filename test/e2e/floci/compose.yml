@@ -1,0 +1,115 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: landlord
+      POSTGRES_PASSWORD: landlord_password
+      POSTGRES_DB: landlord
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U landlord -d landlord"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    networks:
+      - floci
+
+  floci:
+    image: floci/floci:latest
+    user: root
+    environment:
+      FLOCI_DEFAULT_ACCOUNT_ID: ${FLOCI_ACCOUNT_ID}
+      FLOCI_DEFAULT_REGION: us-east-1
+      FLOCI_HOSTNAME: floci
+      FLOCI_STORAGE_MODE: memory
+      FLOCI_SERVICES_LAMBDA_DOCKER_NETWORK: ${FLOCI_NETWORK_NAME}
+      FLOCI_SERVICES_LAMBDA_EPHEMERAL: "true"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - "127.0.0.1:${FLOCI_API_PORT}:4566"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:4566/_localstack/health >/dev/null"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    networks:
+      - floci
+
+  bootstrap:
+    image: floci/floci:latest-compat
+    entrypoint: ["/bin/bash", "/bootstrap/bootstrap.sh"]
+    environment:
+      AWS_ACCESS_KEY_ID: ${FLOCI_ACCOUNT_ID}
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_DEFAULT_REGION: us-east-1
+      AWS_REGION: us-east-1
+      AWS_EC2_METADATA_DISABLED: "true"
+      AWS_ENDPOINT_URL: http://floci:4566
+      FLOCI_ACCOUNT_ID: ${FLOCI_ACCOUNT_ID}
+      FLOCI_LAMBDA_NAME: ${FLOCI_LAMBDA_NAME}
+      FLOCI_LAMBDA_ROLE_NAME: ${FLOCI_LAMBDA_ROLE_NAME}
+      FLOCI_STATE_MACHINE_NAME: ${FLOCI_STATE_MACHINE_NAME}
+      FLOCI_STATE_MACHINE_ROLE_NAME: ${FLOCI_STATE_MACHINE_ROLE_NAME}
+    volumes:
+      - ${FLOCI_ARTIFACT_DIR}:/artifacts:ro
+      - ../../../deploy/aws/stepfunctions/v1/lifecycle.asl.json:/bootstrap/lifecycle.asl.json:ro
+      - ./bootstrap.sh:/bootstrap/bootstrap.sh:ro
+    depends_on:
+      floci:
+        condition: service_healthy
+    networks:
+      - floci
+
+  landlord:
+    build:
+      context: ../../..
+      dockerfile: test/e2e/floci/Dockerfile
+      target: runtime
+    environment:
+      LANDLORD_CONFIG: /etc/landlord/config.yaml
+      AWS_ACCESS_KEY_ID: ${FLOCI_ACCOUNT_ID}
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_DEFAULT_REGION: us-east-1
+      AWS_REGION: us-east-1
+      AWS_EC2_METADATA_DISABLED: "true"
+      AWS_ENDPOINT_URL: http://floci:4566
+    volumes:
+      - ${FLOCI_ARTIFACT_DIR}/config.yaml:/etc/landlord/config.yaml:ro
+    ports:
+      - "127.0.0.1:${LANDLORD_API_PORT}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      bootstrap:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/ready"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    networks:
+      - floci
+
+  cleanup:
+    profiles: ["cleanup"]
+    image: floci/floci:latest-compat
+    entrypoint: ["/bin/bash", "/bootstrap/cleanup.sh"]
+    environment:
+      AWS_ACCESS_KEY_ID: ${FLOCI_ACCOUNT_ID}
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_DEFAULT_REGION: us-east-1
+      AWS_REGION: us-east-1
+      AWS_EC2_METADATA_DISABLED: "true"
+      AWS_ENDPOINT_URL: http://floci:4566
+      FLOCI_LAMBDA_NAME: ${FLOCI_LAMBDA_NAME}
+      FLOCI_LAMBDA_ROLE_NAME: ${FLOCI_LAMBDA_ROLE_NAME}
+      FLOCI_STATE_MACHINE_NAME: ${FLOCI_STATE_MACHINE_NAME}
+      FLOCI_STATE_MACHINE_ROLE_NAME: ${FLOCI_STATE_MACHINE_ROLE_NAME}
+    volumes:
+      - ./cleanup.sh:/bootstrap/cleanup.sh:ro
+    networks:
+      - floci
+
+networks:
+  floci:
+    name: ${FLOCI_NETWORK_NAME}

@@ -33,12 +33,8 @@ func ValidateComputeSpec(spec *TenantComputeSpec) error {
 		return errors.New("provider_type required")
 	}
 
-	// Validate Containers
-	if len(spec.Containers) == 0 {
-		return errors.New("at least one container required")
-	}
-
-	// Validate container names are unique
+	// Providers such as EC2 runners do not use container specifications. Validate
+	// containers when supplied, leaving provider-specific requirements to providers.
 	names := make(map[string]bool)
 	for i, c := range spec.Containers {
 		if c.Name == "" {
@@ -75,12 +71,13 @@ func ValidateComputeSpec(spec *TenantComputeSpec) error {
 		}
 	}
 
-	// Validate resources
-	if spec.Resources.CPU < 128 {
-		return errors.New("cpu must be at least 128 millicores")
-	}
-	if spec.Resources.Memory < 128 {
-		return errors.New("memory must be at least 128 MB")
+	if spec.Resources.CPU != 0 || spec.Resources.Memory != 0 {
+		if spec.Resources.CPU < 128 {
+			return errors.New("cpu must be at least 128 millicores")
+		}
+		if spec.Resources.Memory < 128 {
+			return errors.New("memory must be at least 128 MB")
+		}
 	}
 
 	return nil

@@ -108,3 +108,29 @@ func TestComputeConfigValidate_RejectsIncompleteEC2RunnerDefaults(t *testing.T) 
 	err := cfg.Validate()
 	require.ErrorContains(t, err, "compute.ec2_runner.subnet_id is required")
 }
+
+func TestComputeConfigValidate_Kubernetes(t *testing.T) {
+	cfg := ComputeConfig{Kubernetes: &KubernetesProviderConfig{
+		Kubeconfig:      "/etc/landlord/kubeconfig",
+		NamespacePrefix: "landlord-tenant-",
+		Defaults:        map[string]interface{}{"image_pull_policy": "IfNotPresent"},
+	}}
+
+	require.NoError(t, cfg.Validate())
+	require.Equal(t, []string{"kubernetes"}, cfg.EnabledProviders())
+	require.Equal(t, "kubernetes", cfg.DefaultProvider())
+}
+
+func TestComputeConfigValidate_RejectsKubernetesAPIServerWithoutToken(t *testing.T) {
+	cfg := ComputeConfig{Kubernetes: &KubernetesProviderConfig{APIServer: "https://cluster.example"}}
+
+	err := cfg.Validate()
+	require.ErrorContains(t, err, "compute.kubernetes.bearer_token is required")
+}
+
+func TestComputeConfigValidate_RejectsInvalidKubernetesAPIServer(t *testing.T) {
+	cfg := ComputeConfig{Kubernetes: &KubernetesProviderConfig{APIServer: "cluster.example", BearerToken: "token"}}
+
+	err := cfg.Validate()
+	require.ErrorContains(t, err, "compute.kubernetes.api_server must be a valid HTTP(S) URL")
+}

@@ -30,7 +30,7 @@ func TestMapExecutionStateTimedOut(t *testing.T) {
 
 func TestMapExecutionStateAborted(t *testing.T) {
 	state := mapExecutionState(types.ExecutionStatusAborted)
-	assert.Equal(t, workflow.StateFailed, state)
+	assert.Equal(t, workflow.StateCancelled, state)
 }
 
 func TestMapExecutionStateDefault(t *testing.T) {

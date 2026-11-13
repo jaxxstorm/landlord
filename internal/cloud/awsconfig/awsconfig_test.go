@@ -17,6 +17,19 @@ func TestLoadUsesRegion(t *testing.T) {
 	}
 }
 
+func TestLoadUsesEndpointURL(t *testing.T) {
+	t.Setenv("AWS_EC2_METADATA_DISABLED", "true")
+	t.Setenv("AWS_ENDPOINT_URL", "http://floci.test:4566")
+
+	cfg, err := Load(context.Background(), Options{Region: "us-west-2"})
+	if err != nil {
+		t.Fatalf("expected load to succeed: %v", err)
+	}
+	if cfg.BaseEndpoint == nil || *cfg.BaseEndpoint != "http://floci.test:4566" {
+		t.Fatalf("expected Floci base endpoint, got %v", cfg.BaseEndpoint)
+	}
+}
+
 func TestLoadWithAssumeRole(t *testing.T) {
 	t.Setenv("AWS_EC2_METADATA_DISABLED", "true")
 

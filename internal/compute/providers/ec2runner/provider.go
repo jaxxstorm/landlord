@@ -2,6 +2,7 @@ package ec2runner
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -151,11 +152,11 @@ func (p *Provider) launchInstance(ctx context.Context, spec *compute.TenantCompu
 	input := &ec2.RunInstancesInput{
 		ImageId:          stringPointer(config.AMI),
 		InstanceType:     ec2types.InstanceType(p.config.InstanceType),
-		MinCount:         1,
-		MaxCount:         1,
+		MinCount:         int32Pointer(1),
+		MaxCount:         int32Pointer(1),
 		SubnetId:         stringPointer(p.config.SubnetID),
 		SecurityGroupIds: p.config.SecurityGroupIDs,
-		UserData:         stringPointer(config.UserData),
+		UserData:         stringPointer(base64.StdEncoding.EncodeToString([]byte(config.UserData))),
 		TagSpecifications: []ec2types.TagSpecification{{
 			ResourceType: ec2types.ResourceTypeInstance,
 			Tags:         managedTags(spec, config),
@@ -382,3 +383,5 @@ func instanceEndpoints(instance ec2types.Instance) []compute.Endpoint {
 }
 
 func stringPointer(value string) *string { return &value }
+
+func int32Pointer(value int32) *int32 { return &value }

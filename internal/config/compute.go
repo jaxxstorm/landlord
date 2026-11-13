@@ -3,16 +3,18 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"strings"
 )
 
 // ComputeConfig holds compute provisioning configuration
 type ComputeConfig struct {
-	Docker    *DockerProviderConfig    `mapstructure:"docker"`
-	ECS       *ECSProviderConfig       `mapstructure:"ecs"`
-	EC2Runner *EC2RunnerProviderConfig `mapstructure:"ec2_runner"`
-	Mock      *MockProviderConfig      `mapstructure:"mock"`
-	Unknown   map[string]interface{}   `mapstructure:",remain"`
+	Docker     *DockerProviderConfig     `mapstructure:"docker"`
+	ECS        *ECSProviderConfig        `mapstructure:"ecs"`
+	EC2Runner  *EC2RunnerProviderConfig  `mapstructure:"ec2_runner"`
+	Kubernetes *KubernetesProviderConfig `mapstructure:"kubernetes"`
+	Mock       *MockProviderConfig       `mapstructure:"mock"`
+	Unknown    map[string]interface{}    `mapstructure:",remain"`
 }
 
 // DockerProviderConfig holds Docker provider configuration
@@ -61,6 +63,17 @@ type EC2RunnerAssumeRoleConfig struct {
 	SessionName string `mapstructure:"session_name"`
 }
 
+// KubernetesProviderConfig holds operator-owned Kubernetes connection settings.
+type KubernetesProviderConfig struct {
+	Kubeconfig            string                 `mapstructure:"kubeconfig"`
+	Context               string                 `mapstructure:"context"`
+	APIServer             string                 `mapstructure:"api_server"`
+	BearerToken           string                 `mapstructure:"bearer_token"`
+	NamespacePrefix       string                 `mapstructure:"namespace_prefix"`
+	InsecureSkipTLSVerify bool                   `mapstructure:"insecure_skip_tls_verify"`
+	Defaults              map[string]interface{} `mapstructure:",remain"`
+}
+
 // MockProviderConfig holds mock provider configuration defaults.
 type MockProviderConfig struct {
 	Defaults map[string]interface{} `mapstructure:",remain"`
@@ -106,6 +119,11 @@ func (c *ComputeConfig) Validate() error {
 			return fmt.Errorf("ec2_runner config: %w", err)
 		}
 	}
+	if c.Kubernetes != nil {
+		if err := c.Kubernetes.Validate(); err != nil {
+			return fmt.Errorf("kubernetes config: %w", err)
+		}
+	}
 	if c.Mock != nil {
 		if err := c.Mock.Validate(); err != nil {
 			return fmt.Errorf("mock config: %w", err)
@@ -126,6 +144,9 @@ func (c *ComputeConfig) EnabledProviders() []string {
 	}
 	if c.EC2Runner != nil {
 		providers = append(providers, "ec2-runner")
+	}
+	if c.Kubernetes != nil {
+		providers = append(providers, "kubernetes")
 	}
 	if c.Mock != nil {
 		providers = append(providers, "mock")
@@ -157,6 +178,34 @@ func (e *EC2RunnerProviderConfig) Validate() error {
 	}
 	if e.AssumeRole != nil && strings.TrimSpace(e.AssumeRole.RoleARN) == "" {
 		return fmt.Errorf("compute.ec2_runner.assume_role.role_arn is required when assume_role is configured")
+	}
+	return nil
+}
+
+// Validate validates operator-owned Kubernetes connection settings.
+func (k *KubernetesProviderConfig) Validate() error {
+	if k == nil {
+		return nil
+	}
+	hasKubeconfig := strings.TrimSpace(k.Kubeconfig) != ""
+	hasAPIServer := strings.TrimSpace(k.APIServer) != ""
+	switch {
+	case !hasKubeconfig && !hasAPIServer:
+		return fmt.Errorf("compute.kubernetes.kubeconfig or compute.kubernetes.api_server is required")
+	case hasKubeconfig && hasAPIServer:
+		return fmt.Errorf("only one of compute.kubernetes.kubeconfig or compute.kubernetes.api_server may be configured")
+	}
+	if hasAPIServer {
+		endpoint, err := url.ParseRequestURI(k.APIServer)
+		if err != nil || endpoint.Host == "" || (endpoint.Scheme != "https" && endpoint.Scheme != "http") {
+			return fmt.Errorf("compute.kubernetes.api_server must be a valid HTTP(S) URL")
+		}
+		if strings.TrimSpace(k.BearerToken) == "" {
+			return fmt.Errorf("compute.kubernetes.bearer_token is required when api_server is configured")
+		}
+	}
+	if strings.TrimSpace(k.NamespacePrefix) != "" && !strings.HasSuffix(k.NamespacePrefix, "-") {
+		return fmt.Errorf("compute.kubernetes.namespace_prefix must end with a hyphen")
 	}
 	return nil
 }

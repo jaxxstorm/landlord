@@ -2,6 +2,8 @@ package awsconfig
 
 import (
 	"context"
+	"os"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -19,6 +21,7 @@ type AssumeRoleOptions struct {
 // Options controls AWS SDK configuration loading.
 type Options struct {
 	Region               string
+	EndpointURL          string
 	AssumeRole           *AssumeRoleOptions
 	CredentialsProvider  aws.CredentialsProvider
 	SharedConfigProfile  string
@@ -31,6 +34,13 @@ func Load(ctx context.Context, opts Options) (aws.Config, error) {
 
 	if opts.Region != "" {
 		loadOptions = append(loadOptions, config.WithRegion(opts.Region))
+	}
+	endpointURL := opts.EndpointURL
+	if endpointURL == "" {
+		endpointURL = os.Getenv("AWS_ENDPOINT_URL")
+	}
+	if endpointURL = strings.TrimSpace(endpointURL); endpointURL != "" {
+		loadOptions = append(loadOptions, config.WithBaseEndpoint(endpointURL))
 	}
 	if opts.CredentialsProvider != nil {
 		loadOptions = append(loadOptions, config.WithCredentialsProvider(opts.CredentialsProvider))

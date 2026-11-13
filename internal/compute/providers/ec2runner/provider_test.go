@@ -2,6 +2,7 @@ package ec2runner
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"testing"
 
@@ -67,8 +68,8 @@ func TestProvisionLaunchesTaggedRunner(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "i-new", result.ResourceIDs["instance"])
 	require.Equal(t, "ami-123", *runInput.ImageId)
-	require.Equal(t, "#!/bin/bash", *runInput.UserData)
-	require.Equal(t, int32(1), runInput.MinCount)
+	require.Equal(t, base64.StdEncoding.EncodeToString([]byte("#!/bin/bash")), *runInput.UserData)
+	require.Equal(t, int32(1), *runInput.MinCount)
 	require.NotEmpty(t, runInput.TagSpecifications[0].Tags)
 }
 

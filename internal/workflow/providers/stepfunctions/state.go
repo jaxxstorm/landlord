@@ -15,8 +15,10 @@ func mapExecutionState(status sfnTypes.ExecutionStatus) workflow.ExecutionState 
 		return workflow.StateSucceeded
 	case sfnTypes.ExecutionStatusTimedOut:
 		return workflow.StateTimedOut
-	case sfnTypes.ExecutionStatusFailed, sfnTypes.ExecutionStatusAborted:
+	case sfnTypes.ExecutionStatusFailed:
 		return workflow.StateFailed
+	case sfnTypes.ExecutionStatusAborted:
+		return workflow.StateCancelled
 	default:
 		return workflow.StatePending
 	}
